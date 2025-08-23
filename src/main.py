@@ -157,6 +157,10 @@ async def get_all_memories(
         # Note: Mem0's get_all() method only supports user_id parameter
         memories = mem0_client.get_all(user_id=effective_user_id)
         
+        # Check if memories is a string (error message) or object
+        if isinstance(memories, str):
+            return f"Error retrieving memories: {memories}"
+        
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
         else:
@@ -251,6 +255,10 @@ async def search_memories(
             user_id=effective_user_id,
             limit=limit
         )
+        
+        # Check if memories is a string (error message) or object
+        if isinstance(memories, str):
+            return f"Error searching memories: {memories}"
         
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
