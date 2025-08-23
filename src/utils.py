@@ -92,7 +92,7 @@ def get_mem0_client():
         "config": {
             "connection_string": os.environ.get('DATABASE_URL', ''),
             "collection_name": "mem0_memories",
-            "embedding_model_dims": 1536 if llm_provider == "openai" else 768
+            "embedding_model_dims": 1536 if llm_provider == "openai" else 1024
         }
     }
 
