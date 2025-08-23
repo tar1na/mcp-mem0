@@ -36,11 +36,23 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     Yields:
         Mem0Context: The context containing the Mem0 client
     """
-    # Create and return the Memory client with the helper function in utils.py
-    mem0_client = get_mem0_client()
-    
     try:
+        # Create and return the Memory client with the helper function in utils.py
+        mem0_client = get_mem0_client()
         yield Mem0Context(mem0_client=mem0_client)
+    except Exception as e:
+        # Log the error and provide a helpful message
+        error_msg = f"Failed to initialize Mem0 client: {str(e)}"
+        print(f"ERROR: {error_msg}")
+        print("Please check your environment variables:")
+        print("  - LLM_PROVIDER (openai, openrouter, or ollama)")
+        print("  - LLM_API_KEY (your API key)")
+        print("  - LLM_CHOICE (model name)")
+        print("  - DATABASE_URL (Supabase connection string)")
+        print("  - See env.example for all required variables")
+        
+        # Re-raise the error so the server startup fails gracefully
+        raise RuntimeError(error_msg)
     finally:
         # No explicit cleanup needed for the Mem0 client
         pass

@@ -14,7 +14,7 @@ This project demonstrates how to build an MCP server that enables AI agents to s
 
 The implementation follows the best practices laid out by Anthropic for building MCP servers, allowing seamless integration with any MCP-compatible client while ensuring data privacy and security through proper isolation mechanisms.
 
-> **🚨 Breaking Changes**: This version introduces required `userId` parameters for all memory operations. See the [Migration Guide](README_USER_ISOLATION.md#migration-guide) for details on updating existing code.
+This version introduces required `userId` parameters for all memory operations. See the [Migration Guide](README_USER_ISOLATION.md#migration-guide) for details on updating existing code.
 
 ## Features
 
@@ -61,6 +61,11 @@ The server provides four essential memory management tools with **user and sessi
 4. Create a `.env` file based on `.env.example`:
    ```bash
    cp .env.example .env
+   ```
+   
+   **Or use the interactive setup script:**
+   ```bash
+   python setup_env.py
    ```
 
 5. Configure your environment variables in the `.env` file (see Configuration section)
@@ -300,6 +305,78 @@ The test suite validates:
 - ✅ Cross-session searches (when no sessionId provided)
 - ✅ Security validation (required userId)
 - ✅ Error handling and edge cases
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. "'str' object has no attribute 'get'" Error
+This error typically occurs when the Mem0 client is not properly initialized due to missing environment variables.
+
+**Solution:**
+1. Run the setup script to configure your environment:
+   ```bash
+   python setup_env.py
+   ```
+2. Ensure all required environment variables are set:
+   - `LLM_PROVIDER` (openai, openrouter, or ollama)
+   - `LLM_API_KEY` (your API key)
+   - `LLM_CHOICE` (model name)
+   - `DATABASE_URL` (Supabase connection string)
+3. Restart the MCP server after setting environment variables
+
+#### 2. Mem0 Client Initialization Failed
+If you see "Failed to initialize Mem0 client" errors:
+
+**Check:**
+- API keys are valid and have sufficient credits
+- Database connection string is correct
+- LLM provider is supported (openai, openrouter, or ollama)
+- Required environment variables are set
+
+#### 3. Connection Issues
+For connection problems:
+
+**SSE Transport:**
+- Verify `HOST` and `PORT` are accessible
+- Check firewall settings
+- Ensure the port is not already in use
+
+**STDIO Transport:**
+- Verify the client is properly configured for stdio
+- Check for any buffering issues
+
+### Quick Setup
+
+Use the interactive setup script for easy configuration:
+
+```bash
+python setup_env.py
+```
+
+This will guide you through setting up all required environment variables.
+
+### Manual Configuration
+
+If you prefer manual setup:
+
+1. Copy the example environment file:
+   ```bash
+   cp env.example .env
+   ```
+
+2. Edit `.env` with your actual values:
+   ```bash
+   nano .env  # or use your preferred editor
+   ```
+
+3. Restart the MCP server
+
+### Getting Help
+
+- Check the [User Isolation Documentation](README_USER_ISOLATION.md) for detailed implementation details
+- Review the [Implementation Summary](IMPLEMENTATION_SUMMARY.md) for architecture overview
+- Run the test suite to validate your setup: `python test_user_isolation.py`
 
 ## Additional Resources
 
