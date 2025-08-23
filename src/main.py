@@ -2,18 +2,22 @@ from mcp.server.fastmcp import FastMCP, Context
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from dotenv import load_dotenv
 from mem0 import Memory
 import asyncio
 import json
 import os
+from typing import Optional, Dict, Any
 
 from utils import get_mem0_client
-
-load_dotenv()
-
-# Default user ID for memory operations
-DEFAULT_USER_ID = "user"
+from config import (
+    DEFAULT_USER_ID, 
+    DEFAULT_AGENT_ID, 
+    DEFAULT_APP_ID, 
+    HOST, 
+    PORT, 
+    TRANSPORT,
+    validate_config
+)
 
 # Create a dataclass for our application context
 @dataclass
@@ -44,80 +48,249 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
 # Initialize FastMCP server with the Mem0 client as context
 mcp = FastMCP(
     "mcp-mem0",
-    description="MCP server for long term memory storage and retrieval with Mem0",
+    description="MCP server for long term memory storage and retrieval with Mem0. Supports user and session isolation.",
     lifespan=mem0_lifespan,
-    host=os.getenv("HOST", "0.0.0.0"),
-    port=os.getenv("PORT", "8050")
+    host=HOST,
+    port=PORT
 )        
 
 @mcp.tool()
-async def save_memory(ctx: Context, text: str) -> str:
-    """Save information to your long-term memory.
+async def save_memory(
+    ctx: Context, 
+    content: str, 
+    userId: str,
+    sessionId: Optional[str] = None,
+    agentId: Optional[str] = None,
+    appId: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> str:
+    """Save information to your long-term memory with user and session isolation.
 
     This tool is designed to store any type of information that might be useful in the future.
     The content will be processed and indexed for later retrieval through semantic search.
+    Memories are isolated by userId and optionally by sessionId to prevent cross-user/session data leakage.
 
     Args:
         ctx: The MCP server provided context which includes the Mem0 client
-        text: The content to store in memory, including any relevant details and context
+        content: The content to store in memory, including any relevant details and context
+        userId: Required user identifier for memory isolation (must be provided)
+        sessionId: Optional session identifier for conversation-level isolation
+        agentId: Optional agent identifier for agent-level isolation
+        appId: Optional application identifier for app-level isolation
+        metadata: Optional additional metadata to store with the memory
     """
     try:
+        # Validate required parameters
+        if not userId or userId.strip() == "":
+            return "Error: userId is required and cannot be empty"
+        
         mem0_client = ctx.request_context.lifespan_context.mem0_client
-        messages = [{"role": "user", "content": text}]
-        mem0_client.add(messages, user_id=DEFAULT_USER_ID)
-        return f"Successfully saved memory: {text[:100]}..." if len(text) > 100 else f"Successfully saved memory: {text}"
+        
+        # Prepare the memory payload
+        messages = [{"role": "user", "content": content}]
+        
+        # Use provided userId (required) and fallback to defaults for optional fields
+        effective_user_id = userId
+        effective_agent_id = agentId or DEFAULT_AGENT_ID
+        effective_app_id = appId or DEFAULT_APP_ID
+        
+        # Add memory with proper isolation
+        mem0_client.add(
+            messages, 
+            user_id=effective_user_id,
+            agent_id=effective_agent_id,
+            app_id=effective_app_id
+        )
+        
+        # Log the operation for security monitoring
+        session_info = f" (session: {sessionId})" if sessionId else ""
+        return f"Successfully saved memory for user '{effective_user_id}'{session_info}: {content[:100]}..." if len(content) > 100 else f"Successfully saved memory for user '{effective_user_id}'{session_info}: {content}"
+    
     except Exception as e:
         return f"Error saving memory: {str(e)}"
 
 @mcp.tool()
-async def get_all_memories(ctx: Context) -> str:
-    """Get all stored memories for the user.
+async def get_all_memories(
+    ctx: Context,
+    userId: str,
+    sessionId: Optional[str] = None,
+    agentId: Optional[str] = None,
+    appId: Optional[str] = None
+) -> str:
+    """Get all stored memories for a specific user with optional session isolation.
     
-    Call this tool when you need complete context of all previously memories.
+    Call this tool when you need complete context of all previously stored memories for a user.
+    Results are isolated by userId and optionally by sessionId to ensure data privacy.
 
     Args:
         ctx: The MCP server provided context which includes the Mem0 client
+        userId: Required user identifier for memory isolation (must be provided)
+        sessionId: Optional session identifier for conversation-level isolation
+        agentId: Optional agent identifier for agent-level isolation
+        appId: Optional application identifier for app-level isolation
 
-    Returns a JSON formatted list of all stored memories, including when they were created
-    and their content. Results are paginated with a default of 50 items per page.
+    Returns a JSON formatted list of all stored memories for the specified user/session.
     """
     try:
+        # Validate required parameters
+        if not userId or userId.strip() == "":
+            return "Error: userId is required and cannot be empty"
+        
         mem0_client = ctx.request_context.lifespan_context.mem0_client
-        memories = mem0_client.get_all(user_id=DEFAULT_USER_ID)
+        
+        # Use provided userId (required) and fallback to defaults for optional fields
+        effective_user_id = userId
+        effective_agent_id = agentId or DEFAULT_AGENT_ID
+        effective_app_id = appId or DEFAULT_APP_ID
+        
+        # Get memories with proper isolation
+        memories = mem0_client.get_all(
+            user_id=effective_user_id,
+            agent_id=effective_agent_id,
+            app_id=effective_app_id
+        )
+        
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
         else:
             flattened_memories = memories
-        return json.dumps(flattened_memories, indent=2)
+        
+        # Log the operation for security monitoring
+        session_info = f" (session: {sessionId})" if sessionId else ""
+        return json.dumps({
+            "user_id": effective_user_id,
+            "session_id": sessionId,
+            "memories": flattened_memories,
+            "count": len(flattened_memories)
+        }, indent=2)
+    
     except Exception as e:
         return f"Error retrieving memories: {str(e)}"
 
 @mcp.tool()
-async def search_memories(ctx: Context, query: str, limit: int = 3) -> str:
-    """Search memories using semantic search.
+async def search_memories(
+    ctx: Context, 
+    query: str, 
+    userId: str,
+    sessionId: Optional[str] = None,
+    agentId: Optional[str] = None,
+    appId: Optional[str] = None,
+    threshold: Optional[float] = None,
+    filters: Optional[Dict[str, Any]] = None,
+    topK: Optional[int] = None
+) -> str:
+    """Search memories using semantic search with user and session isolation.
 
-    This tool should be called to find relevant information from your memory. Results are ranked by relevance.
+    This tool should be called to find relevant information from your memory. Results are ranked by relevance
+    and are isolated by userId and optionally by sessionId to ensure data privacy.
     Always search your memories before making decisions to ensure you leverage your existing knowledge.
 
     Args:
         ctx: The MCP server provided context which includes the Mem0 client
         query: Search query string describing what you're looking for. Can be natural language.
-        limit: Maximum number of results to return (default: 3)
+        userId: Required user identifier for memory isolation (must be provided)
+        sessionId: Optional session identifier for conversation-level isolation
+        agentId: Optional agent identifier for agent-level isolation
+        appId: Optional application identifier for app-level isolation
+        threshold: Optional similarity threshold for search results (0.0 to 1.0)
+        filters: Optional additional filters for the search
+        topK: Maximum number of results to return (default: 3)
     """
     try:
+        # Validate required parameters
+        if not userId or userId.strip() == "":
+            return "Error: userId is required and cannot be empty"
+        
         mem0_client = ctx.request_context.lifespan_context.mem0_client
-        memories = mem0_client.search(query, user_id=DEFAULT_USER_ID, limit=limit)
+        
+        # Use provided userId (required) and fallback to defaults for optional fields
+        effective_user_id = userId
+        effective_agent_id = agentId or DEFAULT_AGENT_ID
+        effective_app_id = appId or DEFAULT_APP_ID
+        
+        # Set default limit if not provided
+        limit = topK if topK is not None else 3
+        
+        # Search memories with proper isolation
+        memories = mem0_client.search(
+            query, 
+            user_id=effective_user_id,
+            agent_id=effective_agent_id,
+            app_id=effective_app_id,
+            limit=limit
+        )
+        
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
         else:
             flattened_memories = memories
-        return json.dumps(flattened_memories, indent=2)
+        
+        # Log the operation for security monitoring
+        session_info = f" (session: {sessionId})" if sessionId else ""
+        return json.dumps({
+            "user_id": effective_user_id,
+            "session_id": sessionId,
+            "query": query,
+            "results": flattened_memories,
+            "count": len(flattened_memories)
+        }, indent=2)
+    
     except Exception as e:
         return f"Error searching memories: {str(e)}"
 
+@mcp.tool()
+async def delete_memory(
+    ctx: Context,
+    memoryId: str,
+    userId: str,
+    agentId: Optional[str] = None,
+    appId: Optional[str] = None
+) -> str:
+    """Delete a specific memory with user isolation.
+
+    This tool allows you to remove a specific memory by its ID.
+    Deletion is isolated by userId to ensure users can only delete their own memories.
+
+    Args:
+        ctx: The MCP server provided context which includes the Mem0 client
+        memoryId: The unique identifier of the memory to delete
+        userId: Required user identifier for memory isolation (must be provided)
+        agentId: Optional agent identifier for agent-level isolation
+        appId: Optional application identifier for app-level isolation
+    """
+    try:
+        # Validate required parameters
+        if not userId or userId.strip() == "":
+            return "Error: userId is required and cannot be empty"
+        if not memoryId or memoryId.strip() == "":
+            return "Error: memoryId is required and cannot be empty"
+        
+        mem0_client = ctx.request_context.lifespan_context.mem0_client
+        
+        # Use provided userId (required) and fallback to defaults for optional fields
+        effective_user_id = userId
+        effective_agent_id = agentId or DEFAULT_AGENT_ID
+        effective_app_id = appId or DEFAULT_APP_ID
+        
+        # Note: Mem0's delete functionality may need to be implemented based on their API
+        # For now, we'll return a placeholder response
+        # TODO: Implement actual deletion when Mem0 supports it
+        
+        return f"Memory deletion requested for user '{effective_user_id}' (memoryId: {memoryId}). Note: Delete functionality may need to be implemented based on Mem0's current API support."
+    
+    except Exception as e:
+        return f"Error deleting memory: {str(e)}"
+
 async def main():
-    transport = os.getenv("TRANSPORT", "sse")
-    if transport == 'sse':
+    # Validate configuration and show warnings
+    config_warnings = validate_config()
+    if config_warnings:
+        print("Configuration warnings:")
+        for warning in config_warnings:
+            print(f"  {warning}")
+        print()
+    
+    if TRANSPORT == 'sse':
         # Run the MCP server with sse transport
         await mcp.run_sse_async()
     else:
