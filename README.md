@@ -93,7 +93,7 @@ The following environment variables can be configured in your `.env` file:
 ### User & Application Identification
 | Variable | Description | Example | Required |
 |----------|-------------|----------|----------|
-| `DEFAULT_USER_ID` | Default user ID for development | `default_user` | **Production** |
+| `DEFAULT_USER_ID` | Default user ID for development | `default_user` | Optional |
 | `DEFAULT_AGENT_ID` | Default agent identifier | `my_agent` | Optional |
 | `DEFAULT_APP_ID` | Default application identifier | `my_app` | Optional |
 
@@ -387,8 +387,8 @@ If you prefer manual setup:
 
 ## Security Considerations
 
-- **Production Deployment**: Always override `DEFAULT_USER_ID` in production
-- **User Identification**: Use stable, unique identifiers (UUIDs, auth subject IDs)
+- **Production Deployment**: Consider overriding `DEFAULT_USER_ID` in production for better user isolation
+- **User Identification**: Use stable, unique identifiers (UUIDs, auth subject IDs) when calling MCP tools
 - **Session Management**: Generate transient session IDs for conversations
 - **Environment Variables**: Secure all API keys and database credentials
 - **Regular Testing**: Verify isolation features work correctly in your environment

@@ -26,8 +26,9 @@ def get_mem0_client():
         if not llm_provider:
             raise ValueError("LLM_PROVIDER environment variable is required")
         
-        if not llm_api_key:
-            raise ValueError("LLM_API_KEY environment variable is required")
+        # For Ollama, API key is typically not required
+        if llm_provider != 'ollama' and not llm_api_key:
+            raise ValueError("LLM_API_KEY environment variable is required for non-Ollama providers")
         
         if not llm_model:
             raise ValueError("LLM_CHOICE environment variable is required")
@@ -121,7 +122,7 @@ def get_mem0_client():
     except Exception as e:
         # Return a more descriptive error message
         error_msg = f"Failed to initialize Mem0 client: {str(e)}"
-        if "LLM_API_KEY" in str(e):
+        if "LLM_API_KEY" in str(e) and llm_provider != 'ollama':
             error_msg += ". Please set the LLM_API_KEY environment variable."
         elif "DATABASE_URL" in str(e):
             error_msg += ". Please set the DATABASE_URL environment variable."

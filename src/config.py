@@ -40,13 +40,9 @@ def validate_config() -> list[str]:
     warnings = []
     
     # Check for development defaults in production-like environments
-    if DEFAULT_USER_ID == "default_user":
-        warnings.append(
-            "WARNING: Using default user ID 'default_user'. "
-            "Set DEFAULT_USER_ID environment variable in production."
-        )
+    # Note: DEFAULT_USER_ID is now optional and can use the default value
     
-    if not LLM_API_KEY:
+    if not LLM_API_KEY and LLM_PROVIDER != 'ollama':
         warnings.append(
             "WARNING: No LLM API key provided. "
             "Set LLM_API_KEY environment variable."
@@ -96,6 +92,5 @@ def is_production() -> bool:
     return (
         os.getenv("NODE_ENV") == "production" or
         os.getenv("ENVIRONMENT") == "production" or
-        os.getenv("FLASK_ENV") == "production" or
-        DEFAULT_USER_ID != "default_user"
+        os.getenv("FLASK_ENV") == "production"
     )
