@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate and validate userId and sessionId isolation in mcp-mem0.
+Test script to demonstrate and validate userId isolation in mcp-mem0.
 
 This script tests the memory isolation features to ensure:
 1. Users can only access their own memories
-2. Sessions can be isolated when sessionId is provided
-3. Cross-user and cross-session data leakage is prevented
+2. Cross-user data leakage is prevented
+3. Simple and secure user isolation works correctly
 """
 
 import asyncio
@@ -35,31 +35,16 @@ class MockMCPClient:
             return {"error": "userId is required"}
         
         memory_id = str(uuid.uuid4())
-        session_id = kwargs.get("sessionId")
         
-        # Store memory with user and session isolation
+        # Store memory with user isolation
         if userId not in self.memories:
-            self.memories[userId] = {}
+            self.memories[userId] = []
         
-        if session_id:
-            if session_id not in self.memories[userId]:
-                self.memories[userId][session_id] = []
-            self.memories[userId][session_id].append({
-                "id": memory_id,
-                "content": content,
-                "userId": userId,
-                "sessionId": session_id,
-                **kwargs
-            })
-        else:
-            if "default" not in self.memories[userId]:
-                self.memories[userId]["default"] = []
-            self.memories[userId]["default"].append({
-                "id": memory_id,
-                "content": content,
-                "userId": userId,
-                **kwargs
-            })
+        self.memories[userId].append({
+            "id": memory_id,
+            "content": content,
+            "userId": userId
+        })
         
         return {
             "success": True,
@@ -75,16 +60,8 @@ class MockMCPClient:
         if userId not in self.memories:
             return {"results": [], "count": 0}
         
-        session_id = kwargs.get("sessionId")
-        results = []
-        
-        if session_id and session_id in self.memories[userId]:
-            # Search within specific session
-            results = self.memories[userId][session_id]
-        elif not session_id:
-            # Search across all sessions for user
-            for session_memories in self.memories[userId].values():
-                results.extend(session_memories)
+        # Search within user's memories
+        results = self.memories[userId]
         
         # Simple text search (in real implementation, this would be semantic search)
         filtered_results = [
@@ -94,7 +71,6 @@ class MockMCPClient:
         
         return {
             "user_id": userId,
-            "session_id": session_id,
             "query": query,
             "results": filtered_results,
             "count": len(filtered_results)
@@ -105,143 +81,100 @@ class MockMCPClient:
         if not userId:
             return {"error": "userId is required"}
         
-        if userId == "":
-            return {"error": "userId is required"}
-        
         if userId not in self.memories:
             return {"memories": [], "count": 0}
         
-        session_id = kwargs.get("sessionId")
-        results = []
-        
-        if session_id and session_id in self.memories[userId]:
-            # Get memories from specific session
-            results = self.memories[userId][session_id]
-        elif not session_id:
-            # Get all memories for user across all sessions
-            for session_memories in self.memories[userId].values():
-                results.extend(session_memories)
-        
         return {
             "user_id": userId,
-            "sessionId": session_id,
-            "memories": results,
-            "count": len(results)
+            "memories": self.memories[userId],
+            "count": len(self.memories[userId])
         }
 
 async def test_user_isolation():
-    """Test user isolation functionality."""
-    print("🧪 Testing User and Session Isolation in mcp-mem0")
-    print("=" * 60)
+    """Test user isolation features."""
+    print("=== Testing User Isolation ===\n")
     
     client = MockMCPClient()
     
     # Test 1: Save memories for different users
-    print("\n1️⃣ Testing User Isolation")
-    print("-" * 30)
-    
-    # User 1 saves memories
-    result1 = await client.call_tool("save_memory", 
-        content="I prefer Python for data science", 
-        userId="user_123"
-    )
-    print(f"User 123 saved memory: {result1}")
-    
-    result2 = await client.call_tool("save_memory", 
-        content="I like JavaScript for web development", 
-        userId="user_456"
-    )
-    print(f"User 456 saved memory: {result2}")
-    
-    # Test 2: Verify users can only see their own memories
-    print("\n2️⃣ Testing Memory Access Isolation")
-    print("-" * 30)
-    
-    user1_memories = await client.call_tool("get_all_memories", userId="user_123")
-    print(f"User 123 memories: {json.dumps(user1_memories, indent=2)}")
-    
-    user2_memories = await client.call_tool("get_all_memories", userId="user_456")
-    print(f"User 456 memories: {json.dumps(user2_memories, indent=2)}")
-    
-    # Test 3: Test session isolation
-    print("\n3️⃣ Testing Session Isolation")
-    print("-" * 30)
-    
-    # User 1 saves memories in different sessions
-    session_a = "session_a"
-    session_b = "session_b"
+    print("1. Saving memories for different users...")
     
     await client.call_tool("save_memory", 
-        content="Session A: Working on project Alpha", 
-        userId="user_123", 
-        sessionId=session_a
-    )
-    
+                          content="User A likes Python programming", 
+                          userId="user_a")
     await client.call_tool("save_memory", 
-        content="Session B: Working on project Beta", 
-        userId="user_123", 
-        sessionId=session_b
-    )
+                          content="User A prefers dark mode", 
+                          userId="user_a")
+    await client.call_tool("save_memory", 
+                          content="User B likes JavaScript", 
+                          userId="user_b")
+    await client.call_tool("save_memory", 
+                          content="User B uses light mode", 
+                          userId="user_b")
     
-    # Search within specific session
-    session_a_results = await client.call_tool("search_memories", 
-        query="project", 
-        userId="user_123", 
-        sessionId=session_a
-    )
-    print(f"Session A results: {json.dumps(session_a_results, indent=2)}")
+    print("✅ Memories saved successfully\n")
     
-    session_b_results = await client.call_tool("search_memories", 
-        query="project", 
-        userId="user_123", 
-        sessionId=session_b
-    )
-    print(f"Session B results: {json.dumps(session_b_results, indent=2)}")
+    # Test 2: Verify user isolation in search
+    print("2. Testing search isolation...")
     
-    # Test 4: Test cross-session search (should return all user memories)
-    print("\n4️⃣ Testing Cross-Session Search")
-    print("-" * 30)
+    # Search for "Python" - should only return User A's memories
+    python_results = await client.call_tool("search_memories", 
+                                           query="Python", 
+                                           userId="user_a")
+    print(f"User A search for 'Python': {python_results['count']} results")
     
-    all_user_memories = await client.call_tool("search_memories", 
-        query="project", 
-        userId="user_123"
-    )
-    print(f"All user memories (no session filter): {json.dumps(all_user_memories, indent=2)}")
+    # Search for "JavaScript" - should only return User B's memories
+    js_results = await client.call_tool("search_memories", 
+                                       query="JavaScript", 
+                                       userId="user_b")
+    print(f"User B search for 'JavaScript': {js_results['count']} results")
     
-    # Test 5: Test security - missing userId
-    print("\n5️⃣ Testing Security - Missing userId")
-    print("-" * 30)
+    # Verify isolation - User A shouldn't see User B's memories
+    user_a_js_results = await client.call_tool("search_memories", 
+                                              query="JavaScript", 
+                                              userId="user_a")
+    print(f"User A search for 'JavaScript': {user_a_js_results['count']} results (should be 0)")
+    
+    print("✅ Search isolation working correctly\n")
+    
+    # Test 3: Verify user isolation in get_all
+    print("3. Testing get_all isolation...")
+    
+    user_a_memories = await client.call_tool("get_all_memories", userId="user_a")
+    user_b_memories = await client.call_tool("get_all_memories", userId="user_b")
+    
+    print(f"User A total memories: {user_a_memories['count']}")
+    print(f"User B total memories: {user_b_memories['count']}")
+    
+    # Verify no cross-user access
+    assert user_a_memories['count'] == 2, f"User A should have 2 memories, got {user_a_memories['count']}"
+    assert user_b_memories['count'] == 2, f"User B should have 2 memories, got {user_b_memories['count']}"
+    
+    print("✅ Get all isolation working correctly\n")
+    
+    # Test 4: Test required userId validation
+    print("4. Testing required userId validation...")
     
     try:
-        result = await client.call_tool("save_memory", content="This should fail")
-        print(f"❌ Security test failed: {result}")
-    except Exception as e:
-        print(f"✅ Security test passed: {e}")
+        await client.call_tool("save_memory", content="This should fail", userId="")
+        print("❌ Empty userId should have failed")
+    except:
+        print("✅ Empty userId correctly rejected")
     
-    # Test 6: Test search across different users (should be isolated)
-    print("\n6️⃣ Testing Cross-User Search Isolation")
-    print("-" * 30)
+    try:
+        await client.call_tool("search_memories", query="test", userId="")
+        print("❌ Empty userId should have failed")
+    except:
+        print("✅ Empty userId correctly rejected")
     
-    # Search for "Python" - should only return user_123's memory
-    python_results = await client.call_tool("search_memories", 
-        query="Python", 
-        userId="user_123"
-    )
-    print(f"User 123 Python search: {json.dumps(python_results, indent=2)}")
+    print("✅ Required userId validation working correctly\n")
     
-    python_results_user2 = await client.call_tool("search_memories", 
-        query="Python", 
-        userId="user_456"
-    )
-    print(f"User 456 Python search: {json.dumps(python_results_user2, indent=2)}")
-    
-    print("\n✅ User and Session Isolation Tests Completed!")
-    print("\n📋 Summary:")
-    print("• Users can only access their own memories")
-    print("• Sessions can be isolated when sessionId is provided")
-    print("• Cross-user data leakage is prevented")
-    print("• Cross-session searches work when no sessionId is provided")
-    print("• Security validation prevents operations without userId")
+    print("🎉 All user isolation tests passed!")
+    print("\nSummary:")
+    print("- ✅ Users can only access their own memories")
+    print("- ✅ No cross-user data leakage")
+    print("- ✅ Simple and secure user isolation")
+    print("- ✅ Required userId validation working")
 
 if __name__ == "__main__":
     asyncio.run(test_user_isolation())

@@ -12,8 +12,6 @@ load_dotenv()
 
 # Default values for development/testing only - should be overridden in production
 DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "default_user")
-DEFAULT_AGENT_ID = os.getenv("DEFAULT_AGENT_ID")
-DEFAULT_APP_ID = os.getenv("DEFAULT_APP_ID")
 
 # Server configuration
 HOST = os.getenv("HOST", "0.0.0.0")
@@ -55,31 +53,6 @@ def validate_config() -> list[str]:
         )
     
     return warnings
-
-def get_effective_config(
-    user_id: str,
-    session_id: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    app_id: Optional[str] = None
-) -> dict:
-    """
-    Get effective configuration values for a specific request.
-    
-    Args:
-        user_id: Required user identifier
-        session_id: Optional session identifier
-        agent_id: Optional agent identifier
-        app_id: Optional application identifier
-    
-    Returns:
-        Dictionary with effective configuration values
-    """
-    return {
-        "user_id": user_id,
-        "session_id": session_id,
-        "agent_id": agent_id or DEFAULT_AGENT_ID,
-        "app_id": app_id or DEFAULT_APP_ID,
-    }
 
 def is_production() -> bool:
     """

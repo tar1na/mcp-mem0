@@ -83,8 +83,6 @@ def main():
     
     print("\n--- User Configuration ---")
     default_user_id = get_input("Default User ID (optional)", "default_user")
-    default_agent_id = get_input("Default Agent ID (optional)", "default_agent")
-    default_app_id = get_input("Default App ID (optional)", "default_app")
     
     # Generate .env content
     env_content = f"""# Environment configuration for mcp-mem0
@@ -94,8 +92,6 @@ def main():
 # User and application identifiers
 # =============================================================================
 DEFAULT_USER_ID={default_user_id}
-DEFAULT_AGENT_ID={default_agent_id}
-DEFAULT_APP_ID={default_app_id}
 
 # =============================================================================
 # Server Configuration

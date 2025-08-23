@@ -18,18 +18,17 @@ This version introduces required `userId` parameters for all memory operations. 
 
 ## Features
 
-The server provides four essential memory management tools with **user and session isolation**:
+The server provides four essential memory management tools with **user isolation**:
 
 1. **`save_memory`**: Store any information in long-term memory with semantic indexing and user isolation
-2. **`get_all_memories`**: Retrieve all stored memories for a specific user with optional session scoping
-3. **`search_memories`**: Find relevant memories using semantic search within user and optional session boundaries
+2. **`get_all_memories`**: Retrieve all stored memories for a specific user
+3. **`search_memories`**: Find relevant memories using semantic search within user boundaries
 4. **`delete_memory`**: Remove specific memories with user-level access control
 
 ### 🔒 Security & Isolation Features
 - **Required `userId`**: All operations require user identification for complete isolation
-- **Optional `sessionId`**: Session-scoped memory access for conversation privacy
 - **Cross-User Protection**: No data leakage between different users
-- **Session Management**: Flexible memory access patterns (per-session or cross-session)
+- **Simple & Secure**: Clean, straightforward user isolation without complex metadata filtering
 
 ## Prerequisites
 
@@ -90,12 +89,10 @@ The following environment variables can be configured in your `.env` file:
 | `HOST` | Host to bind to when using SSE transport | `0.0.0.0` |
 | `PORT` | Port to listen on when using SSE transport | `8050` |
 
-### User & Application Identification
+### User Configuration
 | Variable | Description | Example | Required |
 |----------|-------------|----------|----------|
 | `DEFAULT_USER_ID` | Default user ID for development | `default_user` | Optional |
-| `DEFAULT_AGENT_ID` | Default agent identifier | `my_agent` | Optional |
-| `DEFAULT_APP_ID` | Default application identifier | `my_app` | Optional |
 
 ### LLM Configuration
 | Variable | Description | Example |
@@ -244,23 +241,9 @@ await save_memory(
     userId="user_123"
 )
 
-# Save a memory with session isolation
-await save_memory(
-    content="Current conversation about web development",
-    userId="user_123",
-    sessionId="chat_session_abc123"
-)
-
-# Search memories within a session
+# Search memories for a user
 results = await search_memories(
     query="interface preferences",
-    userId="user_123",
-    sessionId="chat_session_abc123"
-)
-
-# Search across all user sessions
-all_results = await search_memories(
-    query="Python",
     userId="user_123"
 )
 
@@ -277,10 +260,9 @@ await delete_memory(
 ### Security & Isolation
 
 - **`userId` is REQUIRED** for all operations
-- **`sessionId` is OPTIONAL** for conversation-level isolation
 - Users can only access their own memories
-- Sessions provide additional privacy boundaries
-- No cross-user or cross-session data leakage
+- Simple and secure user isolation
+- No cross-user data leakage
 
 ## Building Your Own Server
 
@@ -389,6 +371,5 @@ If you prefer manual setup:
 
 - **Production Deployment**: Consider overriding `DEFAULT_USER_ID` in production for better user isolation
 - **User Identification**: Use stable, unique identifiers (UUIDs, auth subject IDs) when calling MCP tools
-- **Session Management**: Generate transient session IDs for conversations
 - **Environment Variables**: Secure all API keys and database credentials
 - **Regular Testing**: Verify isolation features work correctly in your environment

@@ -7,6 +7,23 @@ import os
 import sys
 from pathlib import Path
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Try to find and load the .env file
+env_path = Path(__file__).parent / ".env"
+print(f"Looking for .env file at: {env_path}")
+print(f"File exists: {env_path.exists()}")
+
+if env_path.exists():
+    load_dotenv(env_path)
+    print("✅ .env file loaded successfully")
+else:
+    print("❌ .env file not found")
+    # Try to load from current directory
+    load_dotenv()
+    print("Attempted to load .env from current directory")
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
