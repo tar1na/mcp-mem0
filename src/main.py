@@ -38,7 +38,9 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     """
     try:
         # Create and return the Memory client with the helper function in utils.py
+        print("DEBUG: Starting Mem0 client initialization...")
         mem0_client = get_mem0_client()
+        print(f"DEBUG: Mem0 client initialized successfully: {type(mem0_client)}")
         yield Mem0Context(mem0_client=mem0_client)
     except Exception as e:
         # Log the error and provide a helpful message
@@ -116,11 +118,19 @@ async def save_memory(
         
         # Add memory with proper isolation
         # Note: Mem0's add() method only supports user_id and metadata
-        mem0_client.add(
-            messages, 
-            user_id=effective_user_id,
-            metadata=memory_metadata if memory_metadata else None
-        )
+        try:
+            print(f"DEBUG: Attempting to save memory for user: {effective_user_id}")
+            print(f"DEBUG: Memory content: {content[:100]}...")
+            print(f"DEBUG: Memory metadata: {memory_metadata}")
+            
+            mem0_client.add(
+                messages, 
+                user_id=effective_user_id,
+                metadata=memory_metadata if memory_metadata else None
+            )
+            print(f"DEBUG: Memory saved successfully")
+        except Exception as mem0_error:
+            return f"Error calling Mem0 add: {str(mem0_error)}"
         
         # Log the operation for security monitoring
         session_info = f" (session: {sessionId})" if sessionId else ""
@@ -160,43 +170,69 @@ async def get_all_memories(
         
         mem0_client = ctx.request_context.lifespan_context.mem0_client
         
+        # Debug: Check if mem0_client is properly initialized
+        if mem0_client is None:
+            return "Error: Mem0 client is not properly initialized"
+        
         # Use provided userId (required) and fallback to defaults for optional fields
         effective_user_id = userId
         effective_agent_id = agentId or DEFAULT_AGENT_ID
         effective_app_id = appId or DEFAULT_APP_ID
         
+        # Debug: Log what we're about to do
+        print(f"DEBUG: Attempting to get memories for user: {effective_user_id}")
+        
         # Get memories with proper isolation
         # Note: Mem0's get_all() method only supports user_id parameter
-        memories = mem0_client.get_all(user_id=effective_user_id)
+        try:
+            memories = mem0_client.get_all(user_id=effective_user_id)
+            print(f"DEBUG: Mem0 client returned: {type(memories)} - {memories}")
+        except Exception as mem0_error:
+            return f"Error calling Mem0 get_all: {str(mem0_error)}"
         
         # Check if memories is a string (error message) or object
         if isinstance(memories, str):
             return f"Error retrieving memories: {memories}"
+        
+        # Debug: Check the structure of what we received
+        print(f"DEBUG: Memories type: {type(memories)}")
+        print(f"DEBUG: Memories content: {memories}")
         
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
         else:
             flattened_memories = memories
         
+        # Debug: Check flattened memories
+        print(f"DEBUG: Flattened memories type: {type(flattened_memories)}")
+        print(f"DEBUG: Flattened memories length: {len(flattened_memories) if hasattr(flattened_memories, '__len__') else 'No length'}")
+        
         # Filter memories by agent_id, app_id, and session_id if specified
         filtered_memories = []
         for memory in flattened_memories:
-            # Check if memory has metadata for filtering
-            memory_metadata = memory.get("metadata", {})
+            # Debug: Check each memory structure
+            print(f"DEBUG: Processing memory: {type(memory)} - {memory}")
             
-            # Filter by agent_id if specified
-            if effective_agent_id and memory_metadata.get("agent_id") != effective_agent_id:
-                continue
+            # Check if memory has metadata for filtering
+            if isinstance(memory, dict):
+                memory_metadata = memory.get("metadata", {})
                 
-            # Filter by app_id if specified
-            if effective_app_id and memory_metadata.get("app_id") != effective_app_id:
-                continue
-                
-            # Filter by session_id if specified
-            if sessionId and memory_metadata.get("session_id") != sessionId:
-                continue
-                
-            filtered_memories.append(memory)
+                # Filter by agent_id if specified
+                if effective_agent_id and memory_metadata.get("agent_id") != effective_agent_id:
+                    continue
+                    
+                # Filter by app_id if specified
+                if effective_app_id and memory_metadata.get("app_id") != effective_app_id:
+                    continue
+                    
+                # Filter by session_id if specified
+                if sessionId and memory_metadata.get("session_id") != sessionId:
+                    continue
+                    
+                filtered_memories.append(memory)
+            else:
+                # If memory is not a dict, log it and skip
+                print(f"DEBUG: Skipping non-dict memory: {type(memory)} - {memory}")
         
         # Log the operation for security monitoring
         session_info = f" (session: {sessionId})" if sessionId else ""
@@ -210,10 +246,13 @@ async def get_all_memories(
             "app_id": effective_app_id,
             "memories": filtered_memories,
             "count": len(filtered_memories),
-            "total_count": len(flattened_memories)
+            "total_count": len(flattened_memories) if hasattr(flattened_memories, '__len__') else 0
         }, indent=2)
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"DEBUG: Full error traceback: {error_details}")
         return f"Error retrieving memories: {str(e)}"
 
 @mcp.tool()
@@ -262,40 +301,59 @@ async def search_memories(
         
         # Search memories with proper isolation
         # Note: Mem0's search() method only supports query, user_id, and limit parameters
-        memories = mem0_client.search(
-            query, 
-            user_id=effective_user_id,
-            limit=limit
-        )
+        try:
+            memories = mem0_client.search(
+                query, 
+                user_id=effective_user_id,
+                limit=limit
+            )
+            print(f"DEBUG: Mem0 search returned: {type(memories)} - {memories}")
+        except Exception as mem0_error:
+            return f"Error calling Mem0 search: {str(mem0_error)}"
         
         # Check if memories is a string (error message) or object
         if isinstance(memories, str):
             return f"Error searching memories: {memories}"
+        
+        # Debug: Check the structure of what we received
+        print(f"DEBUG: Search memories type: {type(memories)}")
+        print(f"DEBUG: Search memories content: {memories}")
         
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
         else:
             flattened_memories = memories
         
+        # Debug: Check flattened memories
+        print(f"DEBUG: Flattened search memories type: {type(flattened_memories)}")
+        print(f"DEBUG: Flattened search memories length: {len(flattened_memories) if hasattr(flattened_memories, '__len__') else 'No length'}")
+        
         # Filter memories by agent_id, app_id, and session_id if specified
         filtered_memories = []
         for memory in flattened_memories:
-            # Check if memory has metadata for filtering
-            memory_metadata = memory.get("metadata", {})
+            # Debug: Check each memory structure
+            print(f"DEBUG: Processing search memory: {type(memory)} - {memory}")
             
-            # Filter by agent_id if specified
-            if effective_agent_id and memory_metadata.get("agent_id") != effective_agent_id:
-                continue
+            # Check if memory has metadata for filtering
+            if isinstance(memory, dict):
+                memory_metadata = memory.get("metadata", {})
                 
-            # Filter by app_id if specified
-            if effective_app_id and memory_metadata.get("app_id") != effective_app_id:
-                continue
-                
-            # Filter by session_id if specified
-            if sessionId and memory_metadata.get("session_id") != sessionId:
-                continue
-                
-            filtered_memories.append(memory)
+                # Filter by agent_id if specified
+                if effective_agent_id and memory_metadata.get("agent_id") != effective_agent_id:
+                    continue
+                    
+                # Filter by app_id if specified
+                if effective_app_id and memory_metadata.get("app_id") != effective_app_id:
+                    continue
+                    
+                # Filter by session_id if specified
+                if sessionId and memory_metadata.get("session_id") != sessionId:
+                    continue
+                    
+                filtered_memories.append(memory)
+            else:
+                # If memory is not a dict, log it and skip
+                print(f"DEBUG: Skipping non-dict search memory: {type(memory)} - {memory}")
         
         # Log the operation for security monitoring
         session_info = f" (session: {sessionId})" if sessionId else ""

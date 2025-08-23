@@ -16,11 +16,19 @@ Extract the Following Information:
 
 def get_mem0_client():
     try:
+        print("DEBUG: Starting Mem0 client configuration...")
+        
         # Get LLM provider and configuration
         llm_provider = os.getenv('LLM_PROVIDER')
         llm_api_key = os.getenv('LLM_API_KEY')
         llm_model = os.getenv('LLM_CHOICE')
         embedding_model = os.getenv('EMBEDDING_MODEL_CHOICE')
+        
+        print(f"DEBUG: LLM_PROVIDER: {llm_provider}")
+        print(f"DEBUG: LLM_CHOICE: {llm_model}")
+        print(f"DEBUG: EMBEDDING_MODEL_CHOICE: {embedding_model}")
+        print(f"DEBUG: LLM_BASE_URL: {os.getenv('LLM_BASE_URL')}")
+        print(f"DEBUG: DATABASE_URL: {'SET' if os.getenv('DATABASE_URL') else 'NOT SET'}")
         
         # Validate required environment variables
         if not llm_provider:
@@ -116,8 +124,13 @@ def get_mem0_client():
 
         # config["custom_fact_extraction_prompt"] = CUSTOM_INSTRUCTIONS
         
+        print(f"DEBUG: Final Mem0 config: {config}")
+        print("DEBUG: Creating Mem0 client...")
+        
         # Create and return the Memory client
-        return Memory.from_config(config)
+        client = Memory.from_config(config)
+        print(f"DEBUG: Mem0 client created successfully: {type(client)}")
+        return client
         
     except Exception as e:
         # Return a more descriptive error message
