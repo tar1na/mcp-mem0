@@ -1,6 +1,8 @@
 # Load environment variables first, before any other imports
 from dotenv import load_dotenv
-load_dotenv()
+# Only load .env if environment variables aren't already set
+if not os.getenv('DATABASE_URL'):
+    load_dotenv()
 
 from mcp.server.fastmcp import FastMCP, Context
 from contextlib import asynccontextmanager

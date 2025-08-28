@@ -57,14 +57,22 @@ The server provides four essential memory management tools with **user isolation
    uv pip install -e .
    ```
 
-4. Create a `.env` file based on `.env.example`:
+4. Create a `.env` file using one of these methods:
+   
+   **Option A: Interactive configuration (Recommended)**
    ```bash
-   cp .env.example .env
+   python configure_env.py
    ```
    
-   **Or use the interactive setup script:**
+   **Option B: Use the setup script**
    ```bash
    python setup_env.py
+   ```
+   
+   **Option C: Manual setup**
+   ```bash
+   cp .env.example .env
+   # Then edit .env with your values
    ```
 
 5. Configure your environment variables in the `.env` file (see Configuration section)
@@ -77,6 +85,28 @@ The server provides four essential memory management tools with **user isolation
    ```
 
 2. Create a `.env` file based on `.env.example` and configure your environment variables
+
+### Using Systemd Service (Production)
+
+1. **Configure environment variables** using the interactive configurator:
+   ```bash
+   python configure_env.py
+   ```
+
+2. **Install and start the systemd service**:
+   ```bash
+   sudo ./install_service.sh install
+   ```
+
+3. **Check service status**:
+   ```bash
+   sudo ./install_service.sh status
+   ```
+
+4. **View logs**:
+   ```bash
+   sudo journalctl -u mcp-mem0 -f
+   ```
 
 ## Configuration
 
@@ -275,7 +305,7 @@ This template provides a foundation for building more complex MCP servers. To bu
 
 ## Testing
 
-Run the comprehensive test suite to verify user and session isolation:
+Run the comprehensive test suite to verify user isolation:
 
 ```bash
 python3 test_user_isolation.py
@@ -283,10 +313,44 @@ python3 test_user_isolation.py
 
 The test suite validates:
 - ✅ User isolation (no cross-user data access)
-- ✅ Session isolation (session-scoped searches)
-- ✅ Cross-session searches (when no sessionId provided)
 - ✅ Security validation (required userId)
 - ✅ Error handling and edge cases
+
+## Service Management
+
+### Installation
+```bash
+sudo ./install_service.sh install
+```
+
+### Status Check
+```bash
+sudo ./install_service.sh status
+```
+
+### Uninstallation
+```bash
+sudo ./install_service.sh uninstall
+```
+
+### Manual Service Commands
+```bash
+# Check status
+sudo systemctl status mcp-mem0
+
+# View logs
+sudo journalctl -u mcp-mem0 -f
+
+# Restart service
+sudo systemctl restart mcp-mem0
+
+# Stop service
+sudo systemctl stop mcp-mem0
+
+# Enable/disable auto-start
+sudo systemctl enable mcp-mem0
+sudo systemctl disable mcp-mem0
+```
 
 ## Troubleshooting
 
@@ -330,13 +394,17 @@ For connection problems:
 
 ### Quick Setup
 
-Use the interactive setup script for easy configuration:
+Use the interactive configuration script for easy setup:
 
 ```bash
-python setup_env.py
+python configure_env.py
 ```
 
-This will guide you through setting up all required environment variables.
+This will guide you through setting up all required environment variables with validation and helpful instructions.
+
+Alternative setup methods:
+- **setup_env.py**: Basic setup script
+- **Manual**: Copy env.example and edit manually
 
 ### Manual Configuration
 
