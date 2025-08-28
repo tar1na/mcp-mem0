@@ -6,9 +6,9 @@ Handles environment variables and provides safe defaults for development.
 import os
 from typing import Optional
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv()
+# Environment variables are now loaded in main.py before this module is imported
+# from dotenv import load_dotenv
+# load_dotenv()
 
 # Default values for development/testing only - should be overridden in production
 DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "default_user")
