@@ -1,5 +1,8 @@
 from mem0 import Memory
 import os
+import time
+import asyncio
+from typing import Optional, Dict, Any
 
 # Custom instructions for memory processing
 # These aren't being used right now but Mem0 does support adding custom prompting
@@ -14,6 +17,93 @@ Extract the Following Information:
 - Source: Record where this information came from when applicable.
 """
 
+def is_database_error(error: Exception) -> bool:
+    """Check if an error is related to database connectivity."""
+    error_str = str(error).lower()
+    database_keywords = [
+        'database', 'connection', 'postgresql', 'supabase',
+        'unable to open', 'connection refused', 'timeout',
+        'network', 'host unreachable', 'connection pool',
+        'authentication', 'permission denied'
+    ]
+    return any(keyword in error_str for keyword in database_keywords)
+
+def get_actionable_error_message(error: Exception) -> str:
+    """Generate actionable error messages for common database issues."""
+    error_str = str(error).lower()
+    
+    if 'unable to open database file' in error_str:
+        return (
+            "Database connection lost. This usually means:\n"
+            "1. Database server is restarting\n"
+            "2. Network connection was interrupted\n"
+            "3. Connection pool was exhausted\n"
+            "4. Database permissions changed\n"
+            "The service will automatically retry. If the problem persists:\n"
+            "1. Check database server status\n"
+            "2. Verify network connectivity\n"
+            "3. Check database logs for errors\n"
+            "4. Verify database credentials and permissions"
+        )
+    
+    elif 'connection refused' in error_str:
+        return (
+            "Database connection refused. Please check:\n"
+            "1. Database server is running\n"
+            "2. Database port is accessible\n"
+            "3. Firewall settings\n"
+            "4. Database service status"
+        )
+    
+    elif 'timeout' in error_str:
+        return (
+            "Database operation timed out. This could be due to:\n"
+            "1. Slow database performance\n"
+            "2. Network latency\n"
+            "3. Database under heavy load\n"
+            "4. Connection pool exhaustion"
+        )
+    
+    elif 'authentication' in error_str or 'permission denied' in error_str:
+        return (
+            "Database authentication failed. Please check:\n"
+            "1. Database credentials in .env file\n"
+            "2. Database user permissions\n"
+            "3. Database connection string format\n"
+            "4. Database user account status"
+        )
+    
+    else:
+        return f"Unexpected database error: {str(error)}"
+
+def retry_with_backoff(max_retries: int = 3, base_delay: float = 2.0, max_delay: float = 60.0):
+    """Decorator for retrying operations with exponential backoff."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    
+                    if attempt == max_retries - 1:
+                        raise last_exception
+                    
+                    # Calculate delay with exponential backoff
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    
+                    print(f"Attempt {attempt + 1} failed: {e}")
+                    print(f"Retrying in {delay:.1f} seconds...")
+                    
+                    time.sleep(delay)
+            
+            raise last_exception
+        return wrapper
+    return decorator
+
+@retry_with_backoff(max_retries=3, base_delay=2.0)
 def get_mem0_client():
     try:
         print("DEBUG: Starting Mem0 client configuration...")
@@ -133,7 +223,14 @@ def get_mem0_client():
         return client
         
     except Exception as e:
-        # Return a more descriptive error message
+        # Enhanced error handling with specific database error detection
+        if is_database_error(e):
+            print(f"Database connection error detected: {e}")
+            print(get_actionable_error_message(e))
+            # Re-raise as a specific database error for better handling
+            raise RuntimeError(f"Database connection failed: {str(e)}")
+        
+        # Handle other types of errors
         error_msg = f"Failed to initialize Mem0 client: {str(e)}"
         if "LLM_API_KEY" in str(e) and llm_provider != 'ollama':
             error_msg += ". Please set the LLM_API_KEY environment variable."
@@ -142,6 +239,4 @@ def get_mem0_client():
         elif "LLM_PROVIDER" in str(e):
             error_msg += ". Please set the LLM_PROVIDER environment variable."
         
-        # For now, we'll raise the error so the server can handle it gracefully
-        # In a production environment, you might want to log this and return a fallback client
         raise RuntimeError(error_msg)
