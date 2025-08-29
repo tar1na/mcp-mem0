@@ -116,12 +116,7 @@ EnvironmentFile=$PROJECT_DIR/.env
 Environment=PWD=$PROJECT_DIR
 Environment=PYTHONPATH=$PROJECT_DIR
 
-# Security settings
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=$PROJECT_DIR
+
 
 [Install]
 WantedBy=multi-user.target
