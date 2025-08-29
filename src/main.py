@@ -1,4 +1,5 @@
 # Load environment variables first, before any other imports
+import os
 from dotenv import load_dotenv
 # Only load .env if environment variables aren't already set
 if not os.getenv('DATABASE_URL'):
@@ -11,7 +12,6 @@ from dataclasses import dataclass
 from mem0 import Memory
 import asyncio
 import json
-import os
 from typing import Optional, Dict, Any
 
 from utils import get_mem0_client
