@@ -44,84 +44,98 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     max_retries = 5
     base_retry_delay = 2.0
     
-    for attempt in range(max_retries):
-        try:
-            print(f"DEBUG: Starting Mem0 client initialization (attempt {attempt + 1}/{max_retries})...")
-            
-            # Create the Memory client with retry logic (already implemented in utils.py)
-            mem0_client = get_mem0_client()
-            print(f"DEBUG: Mem0 client initialized successfully: {type(mem0_client)}")
-            
-            # Test basic connectivity by attempting a simple operation
-            print("DEBUG: Testing Mem0 client connectivity...")
+    try:
+        for attempt in range(max_retries):
             try:
-                # Try to get a small sample to verify connection works
-                test_result = mem0_client.get_all(user_id="test_connection", limit=1)
-                print("DEBUG: Mem0 client connectivity test passed")
-            except Exception as test_error:
-                print(f"DEBUG: Connectivity test failed: {test_error}")
-                # If it's a database error, we'll retry; otherwise, fail fast
-                if "database" not in str(test_error).lower() and "connection" not in str(test_error).lower():
-                    raise test_error
-            
-            # If we get here, the client is working
-            yield Mem0Context(mem0_client=mem0_client)
-            break
-            
-        except Exception as e:
-            error_msg = f"Failed to initialize Mem0 client (attempt {attempt + 1}/{max_retries}): {str(e)}"
-            print(f"ERROR: {error_msg}")
-            
-            # Clean up failed client
-            if mem0_client:
+                print(f"DEBUG: Starting Mem0 client initialization (attempt {attempt + 1}/{max_retries})...")
+                
+                # Create the Memory client with retry logic (already implemented in utils.py)
+                mem0_client = get_mem0_client()
+                print(f"DEBUG: Mem0 client initialized successfully: {type(mem0_client)}")
+                
+                # Test basic connectivity by attempting a simple operation
+                print("DEBUG: Testing Mem0 client connectivity...")
                 try:
-                    del mem0_client
-                    mem0_client = None
-                except:
-                    pass
-            
-            if attempt < max_retries - 1:
-                retry_delay = base_retry_delay * (2 ** attempt)  # Exponential backoff
-                print(f"Retrying in {retry_delay:.1f} seconds...")
+                    # Try to get a small sample to verify connection works
+                    test_result = mem0_client.get_all(user_id="test_connection", limit=1)
+                    print("DEBUG: Mem0 client connectivity test passed")
+                except Exception as test_error:
+                    print(f"DEBUG: Connectivity test failed: {test_error}")
+                    # If it's a database error, we'll retry; otherwise, fail fast
+                    if "database" not in str(test_error).lower() and "connection" not in str(test_error).lower():
+                        raise test_error
                 
-                # Provide specific guidance based on error type
-                if "database" in str(e).lower() or "connection" in str(e).lower():
-                    print("Database connection issue detected. This is often temporary.")
-                    print("Common causes:")
-                    print("  - Database server restarting")
-                    print("  - Network connectivity issues")
-                    print("  - Connection pool exhaustion")
-                    print("  - Database permissions changes")
-                    print("The service will automatically retry...")
+                # If we get here, the client is working
+                break
+                
+            except Exception as e:
+                error_msg = f"Failed to initialize Mem0 client (attempt {attempt + 1}/{max_retries}): {str(e)}"
+                print(f"ERROR: {error_msg}")
+                
+                # Clean up failed client
+                if mem0_client:
+                    try:
+                        del mem0_client
+                        mem0_client = None
+                    except:
+                        pass
+                
+                if attempt < max_retries - 1:
+                    retry_delay = base_retry_delay * (2 ** attempt)  # Exponential backoff
+                    print(f"Retrying in {retry_delay:.1f} seconds...")
+                    
+                    # Provide specific guidance based on error type
+                    if "database" in str(e).lower() or "connection" in str(e).lower():
+                        print("Database connection issue detected. This is often temporary.")
+                        print("Common causes:")
+                        print("  - Database server restarting")
+                        print("  - Network connectivity issues")
+                        print("  - Connection pool exhaustion")
+                        print("  - Database permissions changes")
+                        print("The service will automatically retry...")
+                    else:
+                        print("Configuration error detected. Please check:")
+                        print("  - LLM_PROVIDER (openai, openrouter, or ollama)")
+                        print("  - LLM_API_KEY (your API key)")
+                        print("  - LLM_CHOICE (model name)")
+                        print("  - DATABASE_URL (Supabase connection string)")
+                        print("  - See env.example for all required variables")
+                    
+                    # Wait before retry
+                    await asyncio.sleep(retry_delay)
                 else:
-                    print("Configuration error detected. Please check:")
-                    print("  - LLM_PROVIDER (openai, openrouter, or ollama)")
-                    print("  - LLM_API_KEY (your API key)")
-                    print("  - LLM_CHOICE (model name)")
-                    print("  - DATABASE_URL (Supabase connection string)")
-                    print("  - See env.example for all required variables")
-                
-                # Wait before retry
-                import asyncio
-                await asyncio.sleep(retry_delay)
-            else:
-                print("ERROR: All retry attempts failed!")
-                print("Please check your configuration and try again.")
-                print("If the problem persists, check:")
-                print("  1. Database server status")
-                print("  2. Network connectivity")
-                print("  3. Database credentials and permissions")
-                print("  4. Firewall settings")
-                raise RuntimeError(error_msg)
-    
-    # Cleanup after all attempts
-    if mem0_client:
-        try:
-            print("DEBUG: Cleaning up Mem0 client...")
-            # Cleanup code here if needed
-            pass
-        except Exception as cleanup_error:
-            print(f"DEBUG: Error during cleanup: {cleanup_error}")
+                    print("ERROR: All retry attempts failed!")
+                    print("Please check your configuration and try again.")
+                    print("If the problem persists, check:")
+                    print("  1. Database server status")
+                    print("  2. Network connectivity")
+                    print("  3. Database credentials and permissions")
+                    print("  4. Firewall settings")
+                    raise RuntimeError(error_msg)
+        
+        # If we get here, we have a working client
+        if mem0_client is None:
+            raise RuntimeError("Failed to initialize Mem0 client after all retry attempts")
+        
+        # Yield the working client
+        yield Mem0Context(mem0_client=mem0_client)
+        
+    finally:
+        # This cleanup will always run, even if an exception occurs
+        if mem0_client:
+            try:
+                print("DEBUG: Cleaning up Mem0 client...")
+                # Close any open database connections
+                if hasattr(mem0_client, 'close'):
+                    mem0_client.close()
+                elif hasattr(mem0_client, '_close'):
+                    mem0_client._close()
+                # Force garbage collection
+                import gc
+                gc.collect()
+                print("DEBUG: Mem0 client cleanup completed")
+            except Exception as cleanup_error:
+                print(f"DEBUG: Error during cleanup: {cleanup_error}")
 
 # Initialize FastMCP server with the Mem0 client as context
 mcp = FastMCP(

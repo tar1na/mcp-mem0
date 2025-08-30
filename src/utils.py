@@ -208,7 +208,14 @@ def get_mem0_client():
             "config": {
                 "connection_string": database_url,
                 "collection_name": "mem0_memories",
-                "embedding_model_dims": 1536 if llm_provider == "openai" else 1024
+                "embedding_model_dims": 1536 if llm_provider == "openai" else 1024,
+                # Add connection management settings to prevent "too many open files"
+                "pool_size": 5,
+                "max_overflow": 10,
+                "pool_timeout": 30,
+                "pool_recycle": 3600,
+                "connect_timeout": 10,
+                "read_timeout": 30
             }
         }
 
