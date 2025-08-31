@@ -132,6 +132,7 @@ The following environment variables can be configured in your `.env` file:
 | `LLM_API_KEY` | API key for the LLM provider | `sk-...` |
 | `LLM_CHOICE` | LLM model to use | `gpt-4o-mini` |
 | `EMBEDDING_MODEL_CHOICE` | Embedding model to use | `text-embedding-3-small` |
+| `EMBEDDING_MODEL_DIMS` | Embedding model dimensions for vector storage | `1536` |
 
 ### Database Configuration
 | Variable | Description | Example |
@@ -139,6 +140,12 @@ The following environment variables can be configured in your `.env` file:
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:port/db` |
 
 > **⚠️ Security Note**: In production, **ALWAYS** override `DEFAULT_USER_ID` to prevent all users from sharing the same memory space. Use unique identifiers like authentication subject IDs, email hashes, or tenant+user combinations.
+
+> **📏 Embedding Dimensions Note**: The `EMBEDDING_MODEL_DIMS` value must match your embedding model's output dimensions. If not set, the system defaults to:
+> - `1536` for OpenAI models (text-embedding-3-small)
+> - `1024` for Ollama and other models (nomic-embed-text)
+> 
+> You can override these defaults by setting `EMBEDDING_MODEL_DIMS` to any value you need.
 
 ## Running the Server
 

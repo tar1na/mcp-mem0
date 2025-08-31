@@ -23,6 +23,7 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_MODEL = os.getenv("LLM_CHOICE", "gpt-3.5-turbo")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL_CHOICE", "text-embedding-3-small")
+EMBEDDING_MODEL_DIMS = int(os.getenv("EMBEDDING_MODEL_DIMS", "1536"))
 LLM_BASE_URL = os.getenv("LLM_BASE_URL")
 
 # Database configuration
