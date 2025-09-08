@@ -138,3 +138,4 @@ echo "* soft nofile 65536" | sudo tee -a /etc/security/limits.conf
 - **Service Override**: Uses systemd's override mechanism for service-specific limits
 
 The combination of these improvements should resolve the "Too many open files" error and provide a more robust, self-healing MCP server.
+

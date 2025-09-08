@@ -63,3 +63,4 @@ echo "4. Verify the new limits are active:"
 echo "   sudo systemctl show mcp-mem0 | grep LimitNOFILE"
 echo ""
 echo "🔄 The new limits will take effect after a reboot or service restart."
+
