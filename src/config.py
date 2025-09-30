@@ -29,6 +29,10 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL")
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Embedding configuration
+EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+
 # Database connection management settings
 DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
 DATABASE_MAX_CONNECTIONS = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))

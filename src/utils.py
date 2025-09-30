@@ -113,6 +113,7 @@ def get_mem0_client():
         llm_api_key = os.getenv('LLM_API_KEY')
         llm_model = os.getenv('LLM_CHOICE')
         embedding_model = os.getenv('EMBEDDING_MODEL_CHOICE')
+        embedding_api_key = os.getenv('EMBEDDING_API_KEY')
         
         print(f"DEBUG: LLM_PROVIDER: {llm_provider}")
         print(f"DEBUG: LLM_CHOICE: {llm_model}")
@@ -210,16 +211,27 @@ def get_mem0_client():
             }
             
             # Set custom base URL if provided
-            embedding_base_url = os.getenv('LLM_BASE_URL')
+            # Check for dedicated embedding base URL first, then fall back to LLM_BASE_URL
+            embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
             if embedding_base_url:
                 config["embedder"]["config"]["base_url"] = embedding_base_url
                 # Also set in environment for Mem0 internal use
                 os.environ["OPENAI_BASE_URL"] = embedding_base_url
                 print(f"DEBUG: Set custom OpenAI base URL for embedder: {embedding_base_url}")
+                if os.getenv('EMBEDDING_BASE_URL'):
+                    print("DEBUG: Using dedicated EMBEDDING_BASE_URL")
+                else:
+                    print("DEBUG: Using LLM_BASE_URL for embeddings")
             
             # Set API key in environment if not already set
-            if llm_api_key and not os.environ.get("OPENAI_API_KEY"):
-                os.environ["OPENAI_API_KEY"] = llm_api_key
+            # Use embedding API key if available, otherwise fall back to LLM API key
+            api_key_to_use = embedding_api_key or llm_api_key
+            if api_key_to_use and not os.environ.get("OPENAI_API_KEY"):
+                os.environ["OPENAI_API_KEY"] = api_key_to_use
+                if embedding_api_key:
+                    print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings")
+                else:
+                    print(f"DEBUG: Using LLM_API_KEY for embeddings")
         
         elif embedding_provider == 'ollama':
             config["embedder"] = {
@@ -250,16 +262,27 @@ def get_mem0_client():
                 }
                 
                 # Set custom base URL if provided
-                embedding_base_url = os.getenv('LLM_BASE_URL')
+                # Check for dedicated embedding base URL first, then fall back to LLM_BASE_URL
+                embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
                 if embedding_base_url:
                     config["embedder"]["config"]["base_url"] = embedding_base_url
                     # Also set in environment for Mem0 internal use
                     os.environ["OPENAI_BASE_URL"] = embedding_base_url
                     print(f"DEBUG: Set custom OpenAI base URL for embedder (fallback): {embedding_base_url}")
+                    if os.getenv('EMBEDDING_BASE_URL'):
+                        print("DEBUG: Using dedicated EMBEDDING_BASE_URL (fallback)")
+                    else:
+                        print("DEBUG: Using LLM_BASE_URL for embeddings (fallback)")
                 
                 # Set API key in environment if not already set
-                if llm_api_key and not os.environ.get("OPENAI_API_KEY"):
-                    os.environ["OPENAI_API_KEY"] = llm_api_key
+                # Use embedding API key if available, otherwise fall back to LLM API key
+                api_key_to_use = embedding_api_key or llm_api_key
+                if api_key_to_use and not os.environ.get("OPENAI_API_KEY"):
+                    os.environ["OPENAI_API_KEY"] = api_key_to_use
+                    if embedding_api_key:
+                        print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings (fallback)")
+                    else:
+                        print(f"DEBUG: Using LLM_API_KEY for embeddings (fallback)")
             
             elif llm_provider == 'ollama':
                 config["embedder"] = {
