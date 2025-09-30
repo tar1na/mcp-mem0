@@ -23,6 +23,21 @@ from config import (
     validate_config
 )
 from database_manager import get_database_manager, close_database_manager
+
+# Global Mem0 client for direct testing
+_global_mem0_client = None
+
+def get_mem0_client_safe():
+    """Get Mem0 client that works in both MCP context and direct testing."""
+    global _global_mem0_client
+    try:
+        # Try to get from MCP context first
+        return ctx.request_context.lifespan_context.mem0_client
+    except:
+        # Fallback to global client for direct testing
+        if _global_mem0_client is None:
+            _global_mem0_client = get_mem0_client()
+        return _global_mem0_client
 from health_check import health_check_endpoint, detailed_health_endpoint
 
 # Create a dataclass for our application context
@@ -187,7 +202,7 @@ async def save_memory(
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
-        mem0_client = ctx.request_context.lifespan_context.mem0_client
+        mem0_client = get_mem0_client_safe()
         
         # Prepare the memory payload
         messages = [{"role": "user", "content": content}]
@@ -234,7 +249,7 @@ async def get_all_memories(
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
-        mem0_client = ctx.request_context.lifespan_context.mem0_client
+        mem0_client = get_mem0_client_safe()
         
         # Debug: Check if mem0_client is properly initialized
         if mem0_client is None:
@@ -305,7 +320,7 @@ async def search_memories(
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
-        mem0_client = ctx.request_context.lifespan_context.mem0_client
+        mem0_client = get_mem0_client_safe()
         
         # Set default limit if not provided
         limit = topK if topK is not None else 3
@@ -373,7 +388,7 @@ async def delete_memory(
         if not memoryId or memoryId.strip() == "":
             return "Error: memoryId is required and cannot be empty"
         
-        mem0_client = ctx.request_context.lifespan_context.mem0_client
+        mem0_client = get_mem0_client_safe()
         
         # Note: Mem0's delete functionality may need to be implemented based on their API
         # For now, we'll return a placeholder response

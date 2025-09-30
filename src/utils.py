@@ -143,7 +143,7 @@ def get_mem0_client():
                 "config": {
                     "model": llm_model,
                     "temperature": 0.2,
-                    "max_tokens": 2000,
+                    "max_tokens": 1000,  # Reduced for smaller context models
                 }
             }
             
@@ -173,7 +173,7 @@ def get_mem0_client():
                 "config": {
                     "model": llm_model,
                     "temperature": 0.2,
-                    "max_tokens": 2000,
+                    "max_tokens": 1000,  # Reduced for smaller context models
                 }
             }
             
@@ -204,6 +204,11 @@ def get_mem0_client():
             # Ensure we have the correct base URL for OpenAI embedder
             embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
             if embedding_base_url and 'api.openai.com' not in embedding_base_url:
+                # Ensure the URL has a protocol
+                if not embedding_base_url.startswith(('http://', 'https://')):
+                    embedding_base_url = f"http://{embedding_base_url}"
+                    print(f"DEBUG: Added http:// protocol to embedding URL: {embedding_base_url}")
+                
                 os.environ["OPENAI_BASE_URL"] = embedding_base_url
                 print(f"DEBUG: Set OpenAI base URL for mixed configuration: {embedding_base_url}")
         elif llm_provider == 'openai':
@@ -227,6 +232,11 @@ def get_mem0_client():
             # Check for dedicated embedding base URL first, then fall back to LLM_BASE_URL
             embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
             if embedding_base_url:
+                # Ensure the URL has a protocol
+                if not embedding_base_url.startswith(('http://', 'https://')):
+                    embedding_base_url = f"http://{embedding_base_url}"
+                    print(f"DEBUG: Added http:// protocol to embedding URL: {embedding_base_url}")
+                
                 # Set in environment for Mem0 internal use (embedder doesn't support base_url in config)
                 os.environ["OPENAI_BASE_URL"] = embedding_base_url
                 print(f"DEBUG: Set custom OpenAI base URL for embedder: {embedding_base_url}")
@@ -252,6 +262,21 @@ def get_mem0_client():
                         print(f"DEBUG: Using LLM_API_KEY for embeddings")
         
         elif embedding_provider == 'ollama':
+            # Map OpenAI model names to appropriate Ollama models if there's a mismatch
+            if embedding_model and 'text-embedding' in embedding_model.lower():
+                print(f"DEBUG: Detected OpenAI model name '{embedding_model}' with Ollama provider")
+                print("DEBUG: Mapping to appropriate Ollama embedding model")
+                # Map common OpenAI embedding models to Ollama equivalents
+                if 'text-embedding-3-small' in embedding_model.lower():
+                    embedding_model = "nomic-embed-text"
+                    print(f"DEBUG: Mapped to Ollama model: {embedding_model}")
+                elif 'text-embedding-3-large' in embedding_model.lower():
+                    embedding_model = "nomic-embed-text"
+                    print(f"DEBUG: Mapped to Ollama model: {embedding_model}")
+                else:
+                    embedding_model = "nomic-embed-text"
+                    print(f"DEBUG: Mapped to default Ollama model: {embedding_model}")
+            
             config["embedder"] = {
                 "provider": "ollama",
                 "config": {
@@ -261,12 +286,16 @@ def get_mem0_client():
             }
             
             # Set base URL for Ollama if provided
-            embedding_base_url = os.getenv('LLM_BASE_URL')
+            embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
             if embedding_base_url:
                 config["embedder"]["config"]["ollama_base_url"] = embedding_base_url
                 # Also set the base URL in environment for Mem0 internal use
                 os.environ["OLLAMA_BASE_URL"] = embedding_base_url
                 print(f"DEBUG: Set OLLAMA_BASE_URL for embedder: {embedding_base_url}")
+                if os.getenv('EMBEDDING_BASE_URL'):
+                    print("DEBUG: Using dedicated EMBEDDING_BASE_URL for Ollama")
+                else:
+                    print("DEBUG: Using LLM_BASE_URL for Ollama embeddings")
         
         else:
             # Default to using the same provider as LLM if no specific embedding provider is set
