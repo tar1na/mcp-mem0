@@ -171,7 +171,10 @@ def get_mem0_client():
             raise ValueError(f"Unsupported LLM provider: {llm_provider}")
         
         # Configure embedder based on provider
-        if llm_provider == 'openai':
+        # Check if we have a specific embedding provider configured
+        embedding_provider = os.getenv('EMBEDDING_PROVIDER', llm_provider)
+        
+        if embedding_provider == 'openai':
             config["embedder"] = {
                 "provider": "openai",
                 "config": {
@@ -184,7 +187,7 @@ def get_mem0_client():
             if llm_api_key and not os.environ.get("OPENAI_API_KEY"):
                 os.environ["OPENAI_API_KEY"] = llm_api_key
         
-        elif llm_provider == 'ollama':
+        elif embedding_provider == 'ollama':
             config["embedder"] = {
                 "provider": "ollama",
                 "config": {
@@ -197,6 +200,35 @@ def get_mem0_client():
             embedding_base_url = os.getenv('LLM_BASE_URL')
             if embedding_base_url:
                 config["embedder"]["config"]["ollama_base_url"] = embedding_base_url
+        
+        else:
+            # Default to using the same provider as LLM if no specific embedding provider is set
+            if llm_provider == 'openai':
+                config["embedder"] = {
+                    "provider": "openai",
+                    "config": {
+                        "model": embedding_model or "text-embedding-3-small",
+                        "embedding_dims": int(os.getenv("EMBEDDING_MODEL_DIMS", "1536"))
+                    }
+                }
+                
+                # Set API key in environment if not already set
+                if llm_api_key and not os.environ.get("OPENAI_API_KEY"):
+                    os.environ["OPENAI_API_KEY"] = llm_api_key
+            
+            elif llm_provider == 'ollama':
+                config["embedder"] = {
+                    "provider": "ollama",
+                    "config": {
+                        "model": embedding_model or "nomic-embed-text",
+                        "embedding_dims": int(os.getenv("EMBEDDING_MODEL_DIMS", "1024"))
+                    }
+                }
+                
+                # Set base URL for Ollama if provided
+                embedding_base_url = os.getenv('LLM_BASE_URL')
+                if embedding_base_url:
+                    config["embedder"]["config"]["ollama_base_url"] = embedding_base_url
         
         # Configure Supabase vector store
         database_url = os.environ.get('DATABASE_URL')
