@@ -193,13 +193,14 @@ This is useful for:
 The system will log which URLs and API keys are being used:
 
 ```
+DEBUG: Will use custom OpenAI endpoint via environment: http://db-server.local:8009/v1
 DEBUG: Set custom OpenAI base URL: http://db-server.local:8009/v1
 DEBUG: Set custom OpenAI base URL for embedder: http://embedding-server.local:8009/v1
 DEBUG: Using dedicated EMBEDDING_BASE_URL
 DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings
 ```
 
-**Note**: The embedder configuration doesn't support `base_url` parameter directly. Instead, the system sets the `OPENAI_BASE_URL` environment variable, which Mem0 uses internally for embedding operations.
+**Note**: Neither the LLM nor embedder configurations support `base_url` parameter directly in Mem0. Instead, the system sets the `OPENAI_BASE_URL` environment variable, which Mem0 uses internally for both LLM and embedding operations.
 
 Or when using the same API key:
 

@@ -150,8 +150,7 @@ def get_mem0_client():
             # Set custom base URL if provided
             llm_base_url = os.getenv('LLM_BASE_URL')
             if llm_base_url:
-                config["llm"]["config"]["base_url"] = llm_base_url
-                # Also set in environment for Mem0 internal use
+                # Set in environment for Mem0 internal use (LLM config doesn't support base_url)
                 os.environ["OPENAI_BASE_URL"] = llm_base_url
                 print(f"DEBUG: Set custom OpenAI base URL: {llm_base_url}")
             
@@ -203,9 +202,9 @@ def get_mem0_client():
             # For OpenAI, ensure we're using the custom base URL if provided
             llm_base_url = os.getenv('LLM_BASE_URL')
             if llm_base_url and 'api.openai.com' not in llm_base_url:
-                print(f"DEBUG: Using custom OpenAI endpoint: {llm_base_url}")
+                print(f"DEBUG: Will use custom OpenAI endpoint via environment: {llm_base_url}")
             else:
-                print("DEBUG: Using default OpenAI endpoint (api.openai.com)")
+                print("DEBUG: Will use default OpenAI endpoint (api.openai.com)")
         
         if embedding_provider == 'openai':
             config["embedder"] = {

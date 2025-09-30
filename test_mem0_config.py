@@ -18,8 +18,11 @@ def test_mem0_config():
     
     try:
         # Load environment variables
-        from dotenv import load_dotenv
-        load_dotenv()
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            print("⚠️  dotenv not available, using system environment variables")
         
         print("📋 Environment Variables:")
         print(f"  LLM_PROVIDER: {os.getenv('LLM_PROVIDER', 'NOT SET')}")
