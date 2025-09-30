@@ -126,8 +126,9 @@ def get_mem0_client():
             raise ValueError("LLM_PROVIDER environment variable is required")
         
         # For Ollama, API key is typically not required
-        if llm_provider != 'ollama' and not llm_api_key:
-            raise ValueError("LLM_API_KEY environment variable is required for non-Ollama providers")
+        # For other providers, API key is optional (can be empty for servers that don't require auth)
+        if llm_provider != 'ollama' and llm_api_key is None:
+            print("WARNING: LLM_API_KEY not set. Some servers may require authentication.")
         
         if not llm_model:
             raise ValueError("LLM_CHOICE environment variable is required")
@@ -155,8 +156,13 @@ def get_mem0_client():
                 print(f"DEBUG: Set custom OpenAI base URL: {llm_base_url}")
             
             # Set API key in environment if not already set
-            if llm_api_key and not os.environ.get("OPENAI_API_KEY"):
+            # Handle empty API keys (for servers that don't require authentication)
+            if llm_api_key is not None and not os.environ.get("OPENAI_API_KEY"):
                 os.environ["OPENAI_API_KEY"] = llm_api_key
+                if llm_api_key.strip() == "":
+                    print("DEBUG: Using empty API key (server may not require authentication)")
+                else:
+                    print("DEBUG: Using LLM_API_KEY for OpenAI configuration")
                 
             # For OpenRouter, set the specific API key
             if llm_provider == 'openrouter' and llm_api_key:
@@ -214,8 +220,7 @@ def get_mem0_client():
             # Check for dedicated embedding base URL first, then fall back to LLM_BASE_URL
             embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
             if embedding_base_url:
-                config["embedder"]["config"]["base_url"] = embedding_base_url
-                # Also set in environment for Mem0 internal use
+                # Set in environment for Mem0 internal use (embedder doesn't support base_url in config)
                 os.environ["OPENAI_BASE_URL"] = embedding_base_url
                 print(f"DEBUG: Set custom OpenAI base URL for embedder: {embedding_base_url}")
                 if os.getenv('EMBEDDING_BASE_URL'):
@@ -225,13 +230,19 @@ def get_mem0_client():
             
             # Set API key in environment if not already set
             # Use embedding API key if available, otherwise fall back to LLM API key
-            api_key_to_use = embedding_api_key or llm_api_key
-            if api_key_to_use and not os.environ.get("OPENAI_API_KEY"):
+            api_key_to_use = embedding_api_key if embedding_api_key is not None else llm_api_key
+            if api_key_to_use is not None and not os.environ.get("OPENAI_API_KEY"):
                 os.environ["OPENAI_API_KEY"] = api_key_to_use
-                if embedding_api_key:
-                    print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings")
+                if embedding_api_key is not None:
+                    if embedding_api_key.strip() == "":
+                        print(f"DEBUG: Using empty EMBEDDING_API_KEY for embeddings (server may not require authentication)")
+                    else:
+                        print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings")
                 else:
-                    print(f"DEBUG: Using LLM_API_KEY for embeddings")
+                    if llm_api_key and llm_api_key.strip() == "":
+                        print(f"DEBUG: Using empty LLM_API_KEY for embeddings (server may not require authentication)")
+                    else:
+                        print(f"DEBUG: Using LLM_API_KEY for embeddings")
         
         elif embedding_provider == 'ollama':
             config["embedder"] = {
@@ -265,8 +276,7 @@ def get_mem0_client():
                 # Check for dedicated embedding base URL first, then fall back to LLM_BASE_URL
                 embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
                 if embedding_base_url:
-                    config["embedder"]["config"]["base_url"] = embedding_base_url
-                    # Also set in environment for Mem0 internal use
+                    # Set in environment for Mem0 internal use (embedder doesn't support base_url in config)
                     os.environ["OPENAI_BASE_URL"] = embedding_base_url
                     print(f"DEBUG: Set custom OpenAI base URL for embedder (fallback): {embedding_base_url}")
                     if os.getenv('EMBEDDING_BASE_URL'):
@@ -276,13 +286,19 @@ def get_mem0_client():
                 
                 # Set API key in environment if not already set
                 # Use embedding API key if available, otherwise fall back to LLM API key
-                api_key_to_use = embedding_api_key or llm_api_key
-                if api_key_to_use and not os.environ.get("OPENAI_API_KEY"):
+                api_key_to_use = embedding_api_key if embedding_api_key is not None else llm_api_key
+                if api_key_to_use is not None and not os.environ.get("OPENAI_API_KEY"):
                     os.environ["OPENAI_API_KEY"] = api_key_to_use
-                    if embedding_api_key:
-                        print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings (fallback)")
+                    if embedding_api_key is not None:
+                        if embedding_api_key.strip() == "":
+                            print(f"DEBUG: Using empty EMBEDDING_API_KEY for embeddings (fallback - server may not require authentication)")
+                        else:
+                            print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings (fallback)")
                     else:
-                        print(f"DEBUG: Using LLM_API_KEY for embeddings (fallback)")
+                        if llm_api_key and llm_api_key.strip() == "":
+                            print(f"DEBUG: Using empty LLM_API_KEY for embeddings (fallback - server may not require authentication)")
+                        else:
+                            print(f"DEBUG: Using LLM_API_KEY for embeddings (fallback)")
             
             elif llm_provider == 'ollama':
                 config["embedder"] = {
@@ -325,17 +341,29 @@ def get_mem0_client():
         print(f"DEBUG: Environment check - OPENAI_BASE_URL: {'SET' if os.environ.get('OPENAI_BASE_URL') else 'NOT SET'}")
         print(f"DEBUG: Environment check - LLM_BASE_URL: {os.environ.get('LLM_BASE_URL', 'NOT SET')}")
         
+        # Debug embedder config specifically
+        if "embedder" in config:
+            print(f"DEBUG: Embedder config: {config['embedder']}")
+            if "config" in config["embedder"]:
+                print(f"DEBUG: Embedder config details: {config['embedder']['config']}")
+        
         # Create and return the Memory client
-        client = Memory.from_config(config)
-        print(f"DEBUG: Mem0 client created successfully: {type(client)}")
-        
-        # Test the client configuration by checking its internal state
-        if hasattr(client, '_llm') and hasattr(client._llm, 'client'):
-            print(f"DEBUG: Mem0 LLM client type: {type(client._llm.client)}")
-        if hasattr(client, '_embedder') and hasattr(client._embedder, 'client'):
-            print(f"DEBUG: Mem0 Embedder client type: {type(client._embedder.client)}")
-        
-        return client
+        try:
+            client = Memory.from_config(config)
+            print(f"DEBUG: Mem0 client created successfully: {type(client)}")
+            
+            # Test the client configuration by checking its internal state
+            if hasattr(client, '_llm') and hasattr(client._llm, 'client'):
+                print(f"DEBUG: Mem0 LLM client type: {type(client._llm.client)}")
+            if hasattr(client, '_embedder') and hasattr(client._embedder, 'client'):
+                print(f"DEBUG: Mem0 Embedder client type: {type(client._embedder.client)}")
+            
+            return client
+        except Exception as e:
+            print(f"DEBUG: Error creating Mem0 client: {e}")
+            print(f"DEBUG: Error type: {type(e)}")
+            print(f"DEBUG: Error args: {e.args}")
+            raise
         
     except Exception as e:
         # Enhanced error handling with specific database error detection

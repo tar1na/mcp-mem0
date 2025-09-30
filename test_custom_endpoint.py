@@ -23,10 +23,23 @@ def test_custom_endpoint():
     print(f"🧪 Testing Custom OpenAI Endpoints")
     print("=" * 50)
     print(f"LLM Base URL: {base_url}")
-    print(f"LLM API Key: {'SET' if api_key and api_key != 'xxx' else 'NOT SET'}")
+    if api_key and api_key != 'xxx':
+        if api_key.strip() == "":
+            print(f"LLM API Key: EMPTY (server may not require authentication)")
+        else:
+            print(f"LLM API Key: SET ({api_key[:8]}...)")
+    else:
+        print(f"LLM API Key: NOT SET")
+    
     if embedding_base_url:
         print(f"Embedding Base URL: {embedding_base_url}")
-        print(f"Embedding API Key: {'SET' if embedding_api_key else 'NOT SET'}")
+        if embedding_api_key:
+            if embedding_api_key.strip() == "":
+                print(f"Embedding API Key: EMPTY (server may not require authentication)")
+            else:
+                print(f"Embedding API Key: SET ({embedding_api_key[:8]}...)")
+        else:
+            print(f"Embedding API Key: NOT SET")
     else:
         print("Embedding Base URL: Using LLM_BASE_URL")
         print("Embedding API Key: Using LLM_API_KEY")
@@ -36,10 +49,11 @@ def test_custom_endpoint():
     print("1️⃣ Testing Chat Completions...")
     try:
         chat_url = f"{base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
+        
+        # Only add Authorization header if API key is not empty
+        if api_key and api_key.strip() != "":
+            headers["Authorization"] = f"Bearer {api_key}"
         data = {
             "model": "gpt-3.5-turbo",
             "messages": [{"role": "user", "content": "Hello, this is a test."}],
@@ -67,11 +81,12 @@ def test_custom_endpoint():
     try:
         # Use embedding URL and API key if available, otherwise use LLM settings
         embed_url = f"{embedding_base_url or base_url}/embeddings"
-        embed_api_key = embedding_api_key or api_key
-        headers = {
-            "Authorization": f"Bearer {embed_api_key}",
-            "Content-Type": "application/json"
-        }
+        embed_api_key = embedding_api_key if embedding_api_key is not None else api_key
+        headers = {"Content-Type": "application/json"}
+        
+        # Only add Authorization header if API key is not empty
+        if embed_api_key and embed_api_key.strip() != "":
+            headers["Authorization"] = f"Bearer {embed_api_key}"
         data = {
             "model": "text-embedding-3-small",
             "input": "This is a test embedding."

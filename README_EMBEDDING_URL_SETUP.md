@@ -145,6 +145,21 @@ EMBEDDING_BASE_URL=http://embedding-lb.local:8009/v1
 EMBEDDING_MODEL_CHOICE=text-embedding-3-small
 ```
 
+### Example 5: No Authentication Required
+
+```bash
+# Servers that don't require API key authentication
+LLM_PROVIDER=openai
+LLM_BASE_URL=http://no-auth-server.local:8009/v1
+LLM_API_KEY=
+LLM_CHOICE=gpt-3.5-turbo
+
+EMBEDDING_PROVIDER=openai
+EMBEDDING_BASE_URL=http://no-auth-embedding.local:8009/v1
+EMBEDDING_API_KEY=
+EMBEDDING_MODEL_CHOICE=text-embedding-3-small
+```
+
 ## How It Works
 
 ### URL Resolution Logic
@@ -159,6 +174,20 @@ EMBEDDING_MODEL_CHOICE=text-embedding-3-small
 2. **If `EMBEDDING_API_KEY` is not set**: Use `LLM_API_KEY` for embedding operations
 3. **If neither is set**: Use default provider authentication
 
+### Empty API Key Handling
+
+The system supports empty API keys for servers that don't require authentication:
+
+- **Empty string (`""`)**: Server doesn't require authentication
+- **Not set (`null`)**: Use default authentication behavior
+- **Valid key**: Use the provided API key
+
+This is useful for:
+- Local development servers
+- Internal servers with IP-based access control
+- Public APIs without authentication
+- Servers using other authentication methods
+
 ### Debug Logging
 
 The system will log which URLs and API keys are being used:
@@ -170,12 +199,23 @@ DEBUG: Using dedicated EMBEDDING_BASE_URL
 DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings
 ```
 
+**Note**: The embedder configuration doesn't support `base_url` parameter directly. Instead, the system sets the `OPENAI_BASE_URL` environment variable, which Mem0 uses internally for embedding operations.
+
 Or when using the same API key:
 
 ```
 DEBUG: Set custom OpenAI base URL for embedder: http://embedding-server.local:8009/v1
 DEBUG: Using dedicated EMBEDDING_BASE_URL
 DEBUG: Using LLM_API_KEY for embeddings
+```
+
+Or when using empty API keys:
+
+```
+DEBUG: Set custom OpenAI base URL: http://no-auth-server.local:8009/v1
+DEBUG: Using empty API key (server may not require authentication)
+DEBUG: Set custom OpenAI base URL for embedder: http://no-auth-embedding.local:8009/v1
+DEBUG: Using empty EMBEDDING_API_KEY for embeddings (server may not require authentication)
 ```
 
 ## API Compatibility

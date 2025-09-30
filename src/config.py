@@ -59,7 +59,7 @@ def validate_config() -> list[str]:
     if not LLM_API_KEY and LLM_PROVIDER != 'ollama':
         warnings.append(
             "WARNING: No LLM API key provided. "
-            "Set LLM_API_KEY environment variable."
+            "Set LLM_API_KEY environment variable (can be empty for servers that don't require authentication)."
         )
     
     if not DATABASE_URL:
