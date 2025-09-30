@@ -191,13 +191,21 @@ def get_mem0_client():
         # Check if we have a specific embedding provider configured
         embedding_provider = os.getenv('EMBEDDING_PROVIDER', llm_provider)
         
-        # Clear OpenAI environment variables if using Ollama to prevent conflicts
-        if llm_provider == 'ollama':
+        # Clear OpenAI environment variables only if BOTH LLM and embedder are using Ollama
+        if llm_provider == 'ollama' and embedding_provider == 'ollama':
             # Remove any OpenAI API keys that might interfere
             for key in ['OPENAI_API_KEY', 'OPENAI_BASE_URL', 'OPENAI_ORGANIZATION']:
                 if key in os.environ:
                     del os.environ[key]
                     print(f"DEBUG: Cleared {key} environment variable for Ollama configuration")
+        elif llm_provider == 'ollama' and embedding_provider == 'openai':
+            print("DEBUG: Mixed configuration - LLM using Ollama, Embedder using OpenAI")
+            print("DEBUG: Keeping OpenAI environment variables for embedder")
+            # Ensure we have the correct base URL for OpenAI embedder
+            embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
+            if embedding_base_url and 'api.openai.com' not in embedding_base_url:
+                os.environ["OPENAI_BASE_URL"] = embedding_base_url
+                print(f"DEBUG: Set OpenAI base URL for mixed configuration: {embedding_base_url}")
         elif llm_provider == 'openai':
             # For OpenAI, ensure we're using the custom base URL if provided
             llm_base_url = os.getenv('LLM_BASE_URL')
