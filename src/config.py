@@ -29,6 +29,17 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL")
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Database connection management settings
+DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+DATABASE_MAX_CONNECTIONS = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
+DATABASE_MAX_OVERFLOW = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
+DATABASE_POOL_TIMEOUT = int(os.getenv("DATABASE_POOL_TIMEOUT", "30"))
+DATABASE_POOL_RECYCLE = int(os.getenv("DATABASE_POOL_RECYCLE", "3600"))
+DATABASE_HEALTH_CHECK_INTERVAL = int(os.getenv("DATABASE_HEALTH_CHECK_INTERVAL", "60"))
+DATABASE_RETRY_ATTEMPTS = int(os.getenv("DATABASE_RETRY_ATTEMPTS", "3"))
+DATABASE_RETRY_DELAY = float(os.getenv("DATABASE_RETRY_DELAY", "2.0"))
+DATABASE_MAX_RETRY_DELAY = float(os.getenv("DATABASE_MAX_RETRY_DELAY", "60.0"))
+
 def validate_config() -> list[str]:
     """
     Validate the configuration and return a list of warnings/errors.
@@ -51,6 +62,25 @@ def validate_config() -> list[str]:
         warnings.append(
             "WARNING: No database URL provided. "
             "Set DATABASE_URL environment variable."
+        )
+    
+    # Validate database connection settings
+    if DATABASE_POOL_SIZE < 1:
+        warnings.append(
+            "WARNING: DATABASE_POOL_SIZE should be at least 1. "
+            f"Current value: {DATABASE_POOL_SIZE}"
+        )
+    
+    if DATABASE_MAX_CONNECTIONS < DATABASE_POOL_SIZE:
+        warnings.append(
+            "WARNING: DATABASE_MAX_CONNECTIONS should be >= DATABASE_POOL_SIZE. "
+            f"Current values: pool_size={DATABASE_POOL_SIZE}, max_connections={DATABASE_MAX_CONNECTIONS}"
+        )
+    
+    if DATABASE_POOL_TIMEOUT < 5:
+        warnings.append(
+            "WARNING: DATABASE_POOL_TIMEOUT should be at least 5 seconds. "
+            f"Current value: {DATABASE_POOL_TIMEOUT}"
         )
     
     return warnings

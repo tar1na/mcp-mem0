@@ -22,6 +22,8 @@ from config import (
     TRANSPORT,
     validate_config
 )
+from database_manager import get_database_manager, close_database_manager
+from health_check import health_check_endpoint, detailed_health_endpoint
 
 # Create a dataclass for our application context
 @dataclass
@@ -33,6 +35,7 @@ class Mem0Context:
 async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     """
     Manages the Mem0 client lifecycle with enhanced error handling and automatic recovery.
+    Also initializes database connection management.
     
     Args:
         server: The FastMCP server instance
@@ -43,6 +46,15 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     mem0_client = None
     max_retries = 5
     base_retry_delay = 2.0
+    
+    # Initialize database manager
+    try:
+        print("DEBUG: Initializing database manager...")
+        db_manager = get_database_manager()
+        print("DEBUG: Database manager initialized successfully")
+    except Exception as db_error:
+        print(f"ERROR: Failed to initialize database manager: {db_error}")
+        raise RuntimeError(f"Database initialization failed: {db_error}")
     
     try:
         for attempt in range(max_retries):
@@ -135,7 +147,15 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
                 gc.collect()
                 print("DEBUG: Mem0 client cleanup completed")
             except Exception as cleanup_error:
-                print(f"DEBUG: Error during cleanup: {cleanup_error}")
+                print(f"DEBUG: Error during Mem0 cleanup: {cleanup_error}")
+        
+        # Cleanup database manager
+        try:
+            print("DEBUG: Cleaning up database manager...")
+            close_database_manager()
+            print("DEBUG: Database manager cleanup completed")
+        except Exception as db_cleanup_error:
+            print(f"DEBUG: Error during database cleanup: {db_cleanup_error}")
 
 # Initialize FastMCP server with the Mem0 client as context
 mcp = FastMCP(
@@ -363,6 +383,37 @@ async def delete_memory(
     
     except Exception as e:
         return f"Error deleting memory: {str(e)}"
+
+@mcp.tool()
+async def health_check(
+    ctx: Context
+) -> str:
+    """Check the health status of the MCP Mem0 service.
+    
+    This tool provides a quick health check for monitoring and load balancers.
+    Returns basic service status information.
+    """
+    try:
+        return await health_check_endpoint()
+    except Exception as e:
+        return f"Health check failed: {str(e)}"
+
+@mcp.tool()
+async def detailed_health_check(
+    ctx: Context
+) -> str:
+    """Get detailed health status of the MCP Mem0 service.
+    
+    This tool provides comprehensive health information including:
+    - Service uptime and status
+    - Database connection health and pool statistics
+    - Memory usage
+    - Error details if any issues are detected
+    """
+    try:
+        return await detailed_health_endpoint()
+    except Exception as e:
+        return f"Detailed health check failed: {str(e)}"
 
 async def main():
     # Validate configuration and show warnings
