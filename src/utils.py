@@ -3,6 +3,8 @@ import os
 import time
 import asyncio
 from typing import Optional, Dict, Any
+from logger import debug_log, info_log, warning_log, error_log
+from config import LLM_MAX_TOKENS, LLM_CONTEXT_LENGTH, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT_NAME
 
 # Custom instructions for memory processing
 # These aren't being used right now but Mem0 does support adding custom prompting
@@ -106,7 +108,7 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 2.0, max_delay:
 @retry_with_backoff(max_retries=3, base_delay=2.0)
 def get_mem0_client():
     try:
-        print("DEBUG: Starting Mem0 client configuration...")
+        debug_log("Starting Mem0 client configuration...")
         
         # Get LLM provider and configuration
         llm_provider = os.getenv('LLM_PROVIDER')
@@ -115,11 +117,13 @@ def get_mem0_client():
         embedding_model = os.getenv('EMBEDDING_MODEL_CHOICE')
         embedding_api_key = os.getenv('EMBEDDING_API_KEY')
         
-        print(f"DEBUG: LLM_PROVIDER: {llm_provider}")
-        print(f"DEBUG: LLM_CHOICE: {llm_model}")
-        print(f"DEBUG: EMBEDDING_MODEL_CHOICE: {embedding_model}")
-        print(f"DEBUG: LLM_BASE_URL: {os.getenv('LLM_BASE_URL')}")
-        print(f"DEBUG: DATABASE_URL: {'SET' if os.getenv('DATABASE_URL') else 'NOT SET'}")
+        debug_log(f"LLM_PROVIDER: {llm_provider}")
+        debug_log(f"LLM_CHOICE: {llm_model}")
+        debug_log(f"EMBEDDING_MODEL_CHOICE: {embedding_model}")
+        debug_log(f"LLM_BASE_URL: {os.getenv('LLM_BASE_URL')}")
+        debug_log(f"DATABASE_URL: {'SET' if os.getenv('DATABASE_URL') else 'NOT SET'}")
+        debug_log(f"LLM_MAX_TOKENS: {LLM_MAX_TOKENS}")
+        debug_log(f"LLM_CONTEXT_LENGTH: {LLM_CONTEXT_LENGTH}")
         
         # Validate required environment variables
         if not llm_provider:
@@ -128,7 +132,7 @@ def get_mem0_client():
         # For Ollama, API key is typically not required
         # For other providers, API key is optional (can be empty for servers that don't require auth)
         if llm_provider != 'ollama' and llm_api_key is None:
-            print("WARNING: LLM_API_KEY not set. Some servers may require authentication.")
+            warning_log("LLM_API_KEY not set. Some servers may require authentication.")
         
         if not llm_model:
             raise ValueError("LLM_CHOICE environment variable is required")
@@ -143,7 +147,7 @@ def get_mem0_client():
                 "config": {
                     "model": llm_model,
                     "temperature": 0.2,
-                    "max_tokens": 1000,  # Reduced for smaller context models
+                    "max_tokens": LLM_MAX_TOKENS,
                 }
             }
             
@@ -152,16 +156,16 @@ def get_mem0_client():
             if llm_base_url:
                 # Set in environment for Mem0 internal use (LLM config doesn't support base_url)
                 os.environ["OPENAI_BASE_URL"] = llm_base_url
-                print(f"DEBUG: Set custom OpenAI base URL: {llm_base_url}")
+                debug_log(f"Set custom OpenAI base URL: {llm_base_url}")
             
             # Set API key in environment if not already set
             # Handle empty API keys (for servers that don't require authentication)
             if llm_api_key is not None and not os.environ.get("OPENAI_API_KEY"):
                 os.environ["OPENAI_API_KEY"] = llm_api_key
                 if llm_api_key.strip() == "":
-                    print("DEBUG: Using empty API key (server may not require authentication)")
+                    debug_log("Using empty API key (server may not require authentication)")
                 else:
-                    print("DEBUG: Using LLM_API_KEY for OpenAI configuration")
+                    debug_log("Using LLM_API_KEY for OpenAI configuration")
                 
             # For OpenRouter, set the specific API key
             if llm_provider == 'openrouter' and llm_api_key:
@@ -173,17 +177,34 @@ def get_mem0_client():
                 "config": {
                     "model": llm_model,
                     "temperature": 0.2,
-                    "max_tokens": 1000,  # Reduced for smaller context models
+                    "max_tokens": LLM_MAX_TOKENS,
                 }
             }
             
-            # Set base URL for Ollama if provided
-            llm_base_url = os.getenv('LLM_BASE_URL')
-            if llm_base_url:
-                config["llm"]["config"]["ollama_base_url"] = llm_base_url
-                # Also set the base URL in environment for Mem0 internal use
-                os.environ["OLLAMA_BASE_URL"] = llm_base_url
-                print(f"DEBUG: Set OLLAMA_BASE_URL environment variable: {llm_base_url}")
+        elif llm_provider == 'azure':
+            # Validate Azure OpenAI configuration
+            if not AZURE_OPENAI_API_KEY:
+                raise ValueError("AZURE_OPENAI_API_KEY is required for Azure OpenAI")
+            if not AZURE_OPENAI_ENDPOINT:
+                raise ValueError("AZURE_OPENAI_ENDPOINT is required for Azure OpenAI")
+            if not AZURE_OPENAI_DEPLOYMENT_NAME:
+                raise ValueError("AZURE_OPENAI_DEPLOYMENT_NAME is required for Azure OpenAI")
+            
+            # Set Azure OpenAI environment variables for Mem0 internal use
+            os.environ["OPENAI_API_KEY"] = AZURE_OPENAI_API_KEY
+            os.environ["OPENAI_API_BASE"] = AZURE_OPENAI_ENDPOINT
+            os.environ["OPENAI_API_VERSION"] = AZURE_OPENAI_API_VERSION
+            debug_log(f"Set Azure OpenAI configuration: {AZURE_OPENAI_ENDPOINT}")
+            
+            config["llm"] = {
+                "provider": "openai",
+                "config": {
+                    "model": AZURE_OPENAI_DEPLOYMENT_NAME,
+                    "temperature": 0.2,
+                    "max_tokens": LLM_MAX_TOKENS,
+                }
+            }
+            
         else:
             raise ValueError(f"Unsupported LLM provider: {llm_provider}")
         
@@ -197,27 +218,27 @@ def get_mem0_client():
             for key in ['OPENAI_API_KEY', 'OPENAI_BASE_URL', 'OPENAI_ORGANIZATION']:
                 if key in os.environ:
                     del os.environ[key]
-                    print(f"DEBUG: Cleared {key} environment variable for Ollama configuration")
+                    debug_log(f"Cleared {key} environment variable for Ollama configuration")
         elif llm_provider == 'ollama' and embedding_provider == 'openai':
-            print("DEBUG: Mixed configuration - LLM using Ollama, Embedder using OpenAI")
-            print("DEBUG: Keeping OpenAI environment variables for embedder")
+            debug_log("Mixed configuration - LLM using Ollama, Embedder using OpenAI")
+            debug_log("Keeping OpenAI environment variables for embedder")
             # Ensure we have the correct base URL for OpenAI embedder
             embedding_base_url = os.getenv('EMBEDDING_BASE_URL') or os.getenv('LLM_BASE_URL')
             if embedding_base_url and 'api.openai.com' not in embedding_base_url:
                 # Ensure the URL has a protocol
                 if not embedding_base_url.startswith(('http://', 'https://')):
                     embedding_base_url = f"http://{embedding_base_url}"
-                    print(f"DEBUG: Added http:// protocol to embedding URL: {embedding_base_url}")
+                    debug_log(f"Added http:// protocol to embedding URL: {embedding_base_url}")
                 
                 os.environ["OPENAI_BASE_URL"] = embedding_base_url
-                print(f"DEBUG: Set OpenAI base URL for mixed configuration: {embedding_base_url}")
+                debug_log(f"Set OpenAI base URL for mixed configuration: {embedding_base_url}")
         elif llm_provider == 'openai':
             # For OpenAI, ensure we're using the custom base URL if provided
             llm_base_url = os.getenv('LLM_BASE_URL')
             if llm_base_url and 'api.openai.com' not in llm_base_url:
-                print(f"DEBUG: Will use custom OpenAI endpoint via environment: {llm_base_url}")
+                debug_log(f"Will use custom OpenAI endpoint via environment: {llm_base_url}")
             else:
-                print("DEBUG: Will use default OpenAI endpoint (api.openai.com)")
+                debug_log("Will use default OpenAI endpoint (api.openai.com)")
         
         if embedding_provider == 'openai':
             config["embedder"] = {
@@ -235,15 +256,15 @@ def get_mem0_client():
                 # Ensure the URL has a protocol
                 if not embedding_base_url.startswith(('http://', 'https://')):
                     embedding_base_url = f"http://{embedding_base_url}"
-                    print(f"DEBUG: Added http:// protocol to embedding URL: {embedding_base_url}")
+                    debug_log(f"Added http:// protocol to embedding URL: {embedding_base_url}")
                 
                 # Set in environment for Mem0 internal use (embedder doesn't support base_url in config)
                 os.environ["OPENAI_BASE_URL"] = embedding_base_url
-                print(f"DEBUG: Set custom OpenAI base URL for embedder: {embedding_base_url}")
+                debug_log(f"Set custom OpenAI base URL for embedder: {embedding_base_url}")
                 if os.getenv('EMBEDDING_BASE_URL'):
-                    print("DEBUG: Using dedicated EMBEDDING_BASE_URL")
+                    debug_log("Using dedicated EMBEDDING_BASE_URL")
                 else:
-                    print("DEBUG: Using LLM_BASE_URL for embeddings")
+                    debug_log("Using LLM_BASE_URL for embeddings")
             
             # Set API key in environment if not already set
             # Use embedding API key if available, otherwise fall back to LLM API key
@@ -252,30 +273,30 @@ def get_mem0_client():
                 os.environ["OPENAI_API_KEY"] = api_key_to_use
                 if embedding_api_key is not None:
                     if embedding_api_key.strip() == "":
-                        print(f"DEBUG: Using empty EMBEDDING_API_KEY for embeddings (server may not require authentication)")
+                        debug_log(f"Using empty EMBEDDING_API_KEY for embeddings (server may not require authentication)")
                     else:
-                        print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings")
+                        debug_log(f"Using dedicated EMBEDDING_API_KEY for embeddings")
                 else:
                     if llm_api_key and llm_api_key.strip() == "":
-                        print(f"DEBUG: Using empty LLM_API_KEY for embeddings (server may not require authentication)")
+                        debug_log(f"Using empty LLM_API_KEY for embeddings (server may not require authentication)")
                     else:
-                        print(f"DEBUG: Using LLM_API_KEY for embeddings")
+                        debug_log(f"Using LLM_API_KEY for embeddings")
         
         elif embedding_provider == 'ollama':
             # Map OpenAI model names to appropriate Ollama models if there's a mismatch
             if embedding_model and 'text-embedding' in embedding_model.lower():
-                print(f"DEBUG: Detected OpenAI model name '{embedding_model}' with Ollama provider")
-                print("DEBUG: Mapping to appropriate Ollama embedding model")
+                debug_log(f"Detected OpenAI model name '{embedding_model}' with Ollama provider")
+                debug_log("Mapping to appropriate Ollama embedding model")
                 # Map common OpenAI embedding models to Ollama equivalents
                 if 'text-embedding-3-small' in embedding_model.lower():
                     embedding_model = "nomic-embed-text"
-                    print(f"DEBUG: Mapped to Ollama model: {embedding_model}")
+                    debug_log(f"Mapped to Ollama model: {embedding_model}")
                 elif 'text-embedding-3-large' in embedding_model.lower():
                     embedding_model = "nomic-embed-text"
-                    print(f"DEBUG: Mapped to Ollama model: {embedding_model}")
+                    debug_log(f"Mapped to Ollama model: {embedding_model}")
                 else:
                     embedding_model = "nomic-embed-text"
-                    print(f"DEBUG: Mapped to default Ollama model: {embedding_model}")
+                    debug_log(f"Mapped to default Ollama model: {embedding_model}")
             
             config["embedder"] = {
                 "provider": "ollama",
@@ -291,11 +312,11 @@ def get_mem0_client():
                 config["embedder"]["config"]["ollama_base_url"] = embedding_base_url
                 # Also set the base URL in environment for Mem0 internal use
                 os.environ["OLLAMA_BASE_URL"] = embedding_base_url
-                print(f"DEBUG: Set OLLAMA_BASE_URL for embedder: {embedding_base_url}")
+                debug_log(f"Set OLLAMA_BASE_URL for embedder: {embedding_base_url}")
                 if os.getenv('EMBEDDING_BASE_URL'):
-                    print("DEBUG: Using dedicated EMBEDDING_BASE_URL for Ollama")
+                    debug_log("Using dedicated EMBEDDING_BASE_URL for Ollama")
                 else:
-                    print("DEBUG: Using LLM_BASE_URL for Ollama embeddings")
+                    debug_log("Using LLM_BASE_URL for Ollama embeddings")
         
         else:
             # Default to using the same provider as LLM if no specific embedding provider is set
@@ -314,11 +335,11 @@ def get_mem0_client():
                 if embedding_base_url:
                     # Set in environment for Mem0 internal use (embedder doesn't support base_url in config)
                     os.environ["OPENAI_BASE_URL"] = embedding_base_url
-                    print(f"DEBUG: Set custom OpenAI base URL for embedder (fallback): {embedding_base_url}")
+                    debug_log(f"Set custom OpenAI base URL for embedder (fallback): {embedding_base_url}")
                     if os.getenv('EMBEDDING_BASE_URL'):
-                        print("DEBUG: Using dedicated EMBEDDING_BASE_URL (fallback)")
+                        debug_log("Using dedicated EMBEDDING_BASE_URL (fallback)")
                     else:
-                        print("DEBUG: Using LLM_BASE_URL for embeddings (fallback)")
+                        debug_log("Using LLM_BASE_URL for embeddings (fallback)")
                 
                 # Set API key in environment if not already set
                 # Use embedding API key if available, otherwise fall back to LLM API key
@@ -327,14 +348,14 @@ def get_mem0_client():
                     os.environ["OPENAI_API_KEY"] = api_key_to_use
                     if embedding_api_key is not None:
                         if embedding_api_key.strip() == "":
-                            print(f"DEBUG: Using empty EMBEDDING_API_KEY for embeddings (fallback - server may not require authentication)")
+                            debug_log(f"Using empty EMBEDDING_API_KEY for embeddings (fallback - server may not require authentication)")
                         else:
-                            print(f"DEBUG: Using dedicated EMBEDDING_API_KEY for embeddings (fallback)")
+                            debug_log(f"Using dedicated EMBEDDING_API_KEY for embeddings (fallback)")
                     else:
                         if llm_api_key and llm_api_key.strip() == "":
-                            print(f"DEBUG: Using empty LLM_API_KEY for embeddings (fallback - server may not require authentication)")
+                            debug_log(f"Using empty LLM_API_KEY for embeddings (fallback - server may not require authentication)")
                         else:
-                            print(f"DEBUG: Using LLM_API_KEY for embeddings (fallback)")
+                            debug_log(f"Using LLM_API_KEY for embeddings (fallback)")
             
             elif llm_provider == 'ollama':
                 config["embedder"] = {
@@ -351,7 +372,7 @@ def get_mem0_client():
                     config["embedder"]["config"]["ollama_base_url"] = embedding_base_url
                     # Also set the base URL in environment for Mem0 internal use
                     os.environ["OLLAMA_BASE_URL"] = embedding_base_url
-                    print(f"DEBUG: Set OLLAMA_BASE_URL for embedder (fallback): {embedding_base_url}")
+                    debug_log(f"Set OLLAMA_BASE_URL for embedder (fallback): {embedding_base_url}")
         
         # Configure Supabase vector store
         database_url = os.environ.get('DATABASE_URL')
@@ -369,36 +390,36 @@ def get_mem0_client():
 
         # config["custom_fact_extraction_prompt"] = CUSTOM_INSTRUCTIONS
         
-        print(f"DEBUG: Final Mem0 config: {config}")
-        print("DEBUG: Creating Mem0 client...")
+        debug_log(f"Final Mem0 config: {config}")
+        debug_log("Creating Mem0 client...")
         
         # Additional debugging for environment variables
-        print(f"DEBUG: Environment check - OPENAI_API_KEY: {'SET' if os.environ.get('OPENAI_API_KEY') else 'NOT SET'}")
-        print(f"DEBUG: Environment check - OPENAI_BASE_URL: {'SET' if os.environ.get('OPENAI_BASE_URL') else 'NOT SET'}")
-        print(f"DEBUG: Environment check - LLM_BASE_URL: {os.environ.get('LLM_BASE_URL', 'NOT SET')}")
+        debug_log(f"Environment check - OPENAI_API_KEY: {'SET' if os.environ.get('OPENAI_API_KEY') else 'NOT SET'}")
+        debug_log(f"Environment check - OPENAI_BASE_URL: {'SET' if os.environ.get('OPENAI_BASE_URL') else 'NOT SET'}")
+        debug_log(f"Environment check - LLM_BASE_URL: {os.environ.get('LLM_BASE_URL', 'NOT SET')}")
         
         # Debug embedder config specifically
         if "embedder" in config:
-            print(f"DEBUG: Embedder config: {config['embedder']}")
+            debug_log(f"Embedder config: {config['embedder']}")
             if "config" in config["embedder"]:
-                print(f"DEBUG: Embedder config details: {config['embedder']['config']}")
+                debug_log(f"Embedder config details: {config['embedder']['config']}")
         
         # Create and return the Memory client
         try:
             client = Memory.from_config(config)
-            print(f"DEBUG: Mem0 client created successfully: {type(client)}")
+            debug_log(f"Mem0 client created successfully: {type(client)}")
             
             # Test the client configuration by checking its internal state
             if hasattr(client, '_llm') and hasattr(client._llm, 'client'):
-                print(f"DEBUG: Mem0 LLM client type: {type(client._llm.client)}")
+                debug_log(f"Mem0 LLM client type: {type(client._llm.client)}")
             if hasattr(client, '_embedder') and hasattr(client._embedder, 'client'):
-                print(f"DEBUG: Mem0 Embedder client type: {type(client._embedder.client)}")
+                debug_log(f"Mem0 Embedder client type: {type(client._embedder.client)}")
             
             return client
         except Exception as e:
-            print(f"DEBUG: Error creating Mem0 client: {e}")
-            print(f"DEBUG: Error type: {type(e)}")
-            print(f"DEBUG: Error args: {e.args}")
+            debug_log(f"Error creating Mem0 client: {e}")
+            debug_log(f"Error type: {type(e)}")
+            debug_log(f"Error args: {e.args}")
             raise
         
     except Exception as e:

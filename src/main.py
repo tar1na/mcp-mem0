@@ -23,6 +23,7 @@ from config import (
     validate_config
 )
 from database_manager import get_database_manager, close_database_manager
+from logger import setup_logging, debug_log, info_log, warning_log, error_log
 
 # Global Mem0 client for direct testing
 _global_mem0_client = None
@@ -64,9 +65,9 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     
     # Initialize database manager
     try:
-        print("DEBUG: Initializing database manager...")
+        debug_log("Initializing database manager...")
         db_manager = get_database_manager()
-        print("DEBUG: Database manager initialized successfully")
+        debug_log("Database manager initialized successfully")
     except Exception as db_error:
         print(f"ERROR: Failed to initialize database manager: {db_error}")
         raise RuntimeError(f"Database initialization failed: {db_error}")
@@ -74,20 +75,20 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     try:
         for attempt in range(max_retries):
             try:
-                print(f"DEBUG: Starting Mem0 client initialization (attempt {attempt + 1}/{max_retries})...")
+                debug_log(f"Starting Mem0 client initialization (attempt {attempt + 1}/{max_retries})...")
                 
                 # Create the Memory client with retry logic (already implemented in utils.py)
                 mem0_client = get_mem0_client()
-                print(f"DEBUG: Mem0 client initialized successfully: {type(mem0_client)}")
+                debug_log(f"Mem0 client initialized successfully: {type(mem0_client)}")
                 
                 # Test basic connectivity by attempting a simple operation
-                print("DEBUG: Testing Mem0 client connectivity...")
+                debug_log("Testing Mem0 client connectivity...")
                 try:
                     # Try to get a small sample to verify connection works
                     test_result = mem0_client.get_all(user_id="test_connection", limit=1)
-                    print("DEBUG: Mem0 client connectivity test passed")
+                    debug_log("Mem0 client connectivity test passed")
                 except Exception as test_error:
-                    print(f"DEBUG: Connectivity test failed: {test_error}")
+                    debug_log(f"Connectivity test failed: {test_error}")
                     # If it's a database error, we'll retry; otherwise, fail fast
                     if "database" not in str(test_error).lower() and "connection" not in str(test_error).lower():
                         raise test_error
@@ -151,7 +152,7 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
         # This cleanup will always run, even if an exception occurs
         if mem0_client:
             try:
-                print("DEBUG: Cleaning up Mem0 client...")
+                debug_log("Cleaning up Mem0 client...")
                 # Close any open database connections
                 if hasattr(mem0_client, 'close'):
                     mem0_client.close()
@@ -160,17 +161,17 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
                 # Force garbage collection
                 import gc
                 gc.collect()
-                print("DEBUG: Mem0 client cleanup completed")
+                debug_log("Mem0 client cleanup completed")
             except Exception as cleanup_error:
-                print(f"DEBUG: Error during Mem0 cleanup: {cleanup_error}")
+                debug_log(f"Error during Mem0 cleanup: {cleanup_error}")
         
         # Cleanup database manager
         try:
-            print("DEBUG: Cleaning up database manager...")
+            debug_log("Cleaning up database manager...")
             close_database_manager()
-            print("DEBUG: Database manager cleanup completed")
+            debug_log("Database manager cleanup completed")
         except Exception as db_cleanup_error:
-            print(f"DEBUG: Error during database cleanup: {db_cleanup_error}")
+            debug_log(f"Error during database cleanup: {db_cleanup_error}")
 
 # Initialize FastMCP server with the Mem0 client as context
 mcp = FastMCP(
@@ -210,15 +211,15 @@ async def save_memory(
         # Add memory with proper isolation
         # Note: Mem0's add() method only supports user_id and metadata
         try:
-            print(f"DEBUG: Attempting to save memory for user: {userId}")
-            print(f"DEBUG: Memory content: {content[:100]}...")
+            debug_log(f"Attempting to save memory for user: {userId}")
+            debug_log(f"Memory content: {content[:100]}...")
             
             mem0_client.add(
                 messages, 
                 user_id=userId,
                 metadata=None
             )
-            print(f"DEBUG: Memory saved successfully")
+            debug_log("Memory saved successfully")
         except Exception as mem0_error:
             return f"Error calling Mem0 add: {str(mem0_error)}"
         
@@ -256,13 +257,13 @@ async def get_all_memories(
             return "Error: Mem0 client is not properly initialized"
         
         # Debug: Log what we're about to do
-        print(f"DEBUG: Attempting to get memories for user: {userId}")
+        debug_log(f"Attempting to get memories for user: {userId}")
         
         # Get memories with proper isolation
         # Note: Mem0's get_all() method only supports user_id parameter
         try:
             memories = mem0_client.get_all(user_id=userId)
-            print(f"DEBUG: Mem0 client returned: {type(memories)} - {memories}")
+            debug_log(f"Mem0 client returned: {type(memories)} - {memories}")
         except Exception as mem0_error:
             return f"Error calling Mem0 get_all: {str(mem0_error)}"
         
@@ -271,8 +272,8 @@ async def get_all_memories(
             return f"Error retrieving memories: {memories}"
         
         # Debug: Check the structure of what we received
-        print(f"DEBUG: Memories type: {type(memories)}")
-        print(f"DEBUG: Memories content: {memories}")
+        debug_log(f"Memories type: {type(memories)}")
+        debug_log(f"Memories content: {memories}")
         
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
@@ -280,8 +281,8 @@ async def get_all_memories(
             flattened_memories = memories
         
         # Debug: Check flattened memories
-        print(f"DEBUG: Flattened memories type: {type(flattened_memories)}")
-        print(f"DEBUG: Flattened memories length: {len(flattened_memories) if hasattr(flattened_memories, '__len__') else 'No length'}")
+        debug_log(f"Flattened memories type: {type(flattened_memories)}")
+        debug_log(f"Flattened memories length: {len(flattened_memories) if hasattr(flattened_memories, '__len__') else 'No length'}")
         
         # Return all memories for the user (no filtering needed)
         return json.dumps({
@@ -293,7 +294,7 @@ async def get_all_memories(
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"DEBUG: Full error traceback: {error_details}")
+        debug_log(f"Full error traceback: {error_details}")
         return f"Error retrieving memories: {str(e)}"
 
 @mcp.tool()
@@ -331,7 +332,7 @@ async def search_memories(
                 user_id=userId,
                 limit=limit
             )
-            print(f"DEBUG: Mem0 search returned: {type(memories)} - {memories}")
+            debug_log(f"Mem0 search returned: {type(memories)} - {memories}")
         except Exception as mem0_error:
             return f"Error calling Mem0 search: {str(mem0_error)}"
         
@@ -340,8 +341,8 @@ async def search_memories(
             return f"Error searching memories: {memories}"
         
         # Debug: Check the structure of what we received
-        print(f"DEBUG: Search memories type: {type(memories)}")
-        print(f"DEBUG: Search memories content: {memories}")
+        debug_log(f"Search memories type: {type(memories)}")
+        debug_log(f"Search memories content: {memories}")
         
         if isinstance(memories, dict) and "results" in memories:
             flattened_memories = [memory["memory"] for memory in memories["results"]]
@@ -349,8 +350,8 @@ async def search_memories(
             flattened_memories = memories
         
         # Debug: Check flattened memories
-        print(f"DEBUG: Flattened search memories type: {type(flattened_memories)}")
-        print(f"DEBUG: Flattened search memories length: {len(flattened_memories) if hasattr(flattened_memories, '__len__') else 'No length'}")
+        debug_log(f"Flattened search memories type: {type(flattened_memories)}")
+        debug_log(f"Flattened search memories length: {len(flattened_memories) if hasattr(flattened_memories, '__len__') else 'No length'}")
         
         # Return all search results for the user (no filtering needed)
         return json.dumps({
@@ -429,13 +430,16 @@ async def detailed_health_check(
         return f"Detailed health check failed: {str(e)}"
 
 async def main():
+    # Setup logging first
+    logger = setup_logging()
+    
     # Validate configuration and show warnings
     config_warnings = validate_config()
     if config_warnings:
-        print("Configuration warnings:")
+        warning_log("Configuration warnings:")
         for warning in config_warnings:
-            print(f"  {warning}")
-        print()
+            warning_log(f"  {warning}")
+        warning_log("")
     
     if TRANSPORT == 'sse':
         # Run the MCP server with sse transport
