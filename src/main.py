@@ -27,18 +27,24 @@ from logger import setup_logging, debug_log, info_log, warning_log, error_log
 
 # Global Mem0 client for direct testing
 _global_mem0_client = None
+_server_ready = False
 
 def get_mem0_client_safe():
-    """Get Mem0 client that works in both MCP context and direct testing."""
+    """Get Mem0 client for direct testing (fallback when MCP context is not available)."""
     global _global_mem0_client
-    try:
-        # Try to get from MCP context first
-        return ctx.request_context.lifespan_context.mem0_client
-    except:
-        # Fallback to global client for direct testing
-        if _global_mem0_client is None:
-            _global_mem0_client = get_mem0_client()
-        return _global_mem0_client
+    if _global_mem0_client is None:
+        _global_mem0_client = get_mem0_client()
+    return _global_mem0_client
+
+def is_server_ready():
+    """Check if the server is ready to accept requests."""
+    global _server_ready
+    return _server_ready
+
+def set_server_ready():
+    """Mark the server as ready to accept requests."""
+    global _server_ready
+    _server_ready = True
 from health_check import health_check_endpoint, detailed_health_endpoint
 
 # Create a dataclass for our application context
@@ -145,6 +151,10 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
         if mem0_client is None:
             raise RuntimeError("Failed to initialize Mem0 client after all retry attempts")
         
+        # Mark server as ready only after Mem0 client is fully initialized
+        set_server_ready()
+        info_log("Server is now ready to accept requests")
+        
         # Yield the working client
         yield Mem0Context(mem0_client=mem0_client)
         
@@ -199,11 +209,16 @@ async def save_memory(
         userId: Required user identifier for memory isolation (must be provided)
     """
     try:
+        # Check if server is ready
+        if not is_server_ready():
+            return "Error: Server is not ready yet. Please wait a moment and try again."
+        
         # Validate required parameters
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
-        mem0_client = get_mem0_client_safe()
+        # Get Mem0 client from MCP context
+        mem0_client = ctx.request_context.lifespan_context.mem0_client
         
         # Prepare the memory payload
         messages = [{"role": "user", "content": content}]
@@ -246,11 +261,16 @@ async def get_all_memories(
     Returns a JSON formatted list of all stored memories for the specified user.
     """
     try:
+        # Check if server is ready
+        if not is_server_ready():
+            return "Error: Server is not ready yet. Please wait a moment and try again."
+        
         # Validate required parameters
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
-        mem0_client = get_mem0_client_safe()
+        # Get Mem0 client from MCP context
+        mem0_client = ctx.request_context.lifespan_context.mem0_client
         
         # Debug: Check if mem0_client is properly initialized
         if mem0_client is None:
@@ -315,11 +335,16 @@ async def search_memories(
         userId: Required user identifier for memory isolation (must be provided)
     """
     try:
+        # Check if server is ready
+        if not is_server_ready():
+            return "Error: Server is not ready yet. Please wait a moment and try again."
+        
         # Validate required parameters
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
-        mem0_client = get_mem0_client_safe()
+        # Get Mem0 client from MCP context
+        mem0_client = ctx.request_context.lifespan_context.mem0_client
         
         # Set fixed limit for search results
         limit = 3
@@ -381,13 +406,18 @@ async def delete_memory(
         userId: Required user identifier for memory isolation (must be provided)
     """
     try:
+        # Check if server is ready
+        if not is_server_ready():
+            return "Error: Server is not ready yet. Please wait a moment and try again."
+        
         # Validate required parameters
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         if not memoryId or memoryId.strip() == "":
             return "Error: memoryId is required and cannot be empty"
         
-        mem0_client = get_mem0_client_safe()
+        # Get Mem0 client from MCP context
+        mem0_client = ctx.request_context.lifespan_context.mem0_client
         
         # Note: Mem0's delete functionality may need to be implemented based on their API
         # For now, we'll return a placeholder response
@@ -453,6 +483,8 @@ async def main():
     
     # Add a small delay to ensure everything is ready
     await asyncio.sleep(1)
+    
+    # Note: Server readiness will be set by the lifespan context after full initialization
     
     if TRANSPORT == 'sse':
         # Run the MCP server with sse transport

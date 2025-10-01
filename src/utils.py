@@ -192,14 +192,21 @@ def get_mem0_client():
             
             # Set Azure OpenAI environment variables for Mem0 internal use
             os.environ["OPENAI_API_KEY"] = AZURE_OPENAI_API_KEY
-            os.environ["OPENAI_BASE_URL"] = AZURE_OPENAI_ENDPOINT  # Use OPENAI_BASE_URL instead of deprecated OPENAI_API_BASE
+            
+            # Construct proper Azure OpenAI URL format with deployment name in path and API version as query parameter
+            azure_base_url = AZURE_OPENAI_ENDPOINT.rstrip('/')
+            if not azure_base_url.endswith('/openai/deployments/' + AZURE_OPENAI_DEPLOYMENT_NAME):
+                azure_base_url = f"{azure_base_url}/openai/deployments/{AZURE_OPENAI_DEPLOYMENT_NAME}"
+            
+            # Set base URL without query parameter (Mem0 will add /chat/completions)
+            os.environ["OPENAI_BASE_URL"] = azure_base_url
             os.environ["OPENAI_API_VERSION"] = AZURE_OPENAI_API_VERSION
-            debug_log(f"Configured Azure OpenAI through OpenAI client: {AZURE_OPENAI_ENDPOINT}")
+            debug_log(f"Configured Azure OpenAI through OpenAI client: {azure_base_url}")
             
             config["llm"] = {
                 "provider": "openai",
                 "config": {
-                    "model": AZURE_OPENAI_DEPLOYMENT_NAME,
+                    "model": AZURE_OPENAI_DEPLOYMENT_NAME,  # Use the deployment name
                     "temperature": 0.2,
                     "max_tokens": LLM_MAX_TOKENS,
                 }
