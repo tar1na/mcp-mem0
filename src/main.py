@@ -441,6 +441,19 @@ async def main():
             warning_log(f"  {warning}")
         warning_log("")
     
+    # Pre-initialize the Mem0 client to ensure it's ready before server starts
+    info_log("Pre-initializing Mem0 client...")
+    try:
+        global _global_mem0_client
+        _global_mem0_client = get_mem0_client()
+        info_log("Mem0 client pre-initialized successfully")
+    except Exception as e:
+        error_log(f"Failed to pre-initialize Mem0 client: {e}")
+        raise RuntimeError(f"Mem0 client pre-initialization failed: {e}")
+    
+    # Add a small delay to ensure everything is ready
+    await asyncio.sleep(1)
+    
     if TRANSPORT == 'sse':
         # Run the MCP server with sse transport
         await mcp.run_sse_async()

@@ -193,8 +193,9 @@ def get_mem0_client():
             # Set Azure OpenAI environment variables for Mem0 internal use
             os.environ["OPENAI_API_KEY"] = AZURE_OPENAI_API_KEY
             os.environ["OPENAI_API_BASE"] = AZURE_OPENAI_ENDPOINT
+            os.environ["OPENAI_BASE_URL"] = AZURE_OPENAI_ENDPOINT
             os.environ["OPENAI_API_VERSION"] = AZURE_OPENAI_API_VERSION
-            debug_log(f"Set Azure OpenAI configuration: {AZURE_OPENAI_ENDPOINT}")
+            debug_log(f"Configured Azure OpenAI through OpenAI client: {AZURE_OPENAI_ENDPOINT}")
             
             config["llm"] = {
                 "provider": "openai",
