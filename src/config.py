@@ -29,6 +29,35 @@ LLM_BASE_URL = os.getenv("LLM_BASE_URL")
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Embedding configuration
+EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+
+# Azure OpenAI configuration
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+
+# Database connection management settings
+DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
+DATABASE_MAX_CONNECTIONS = int(os.getenv("DATABASE_MAX_CONNECTIONS", "20"))
+DATABASE_MAX_OVERFLOW = int(os.getenv("DATABASE_MAX_OVERFLOW", "10"))
+DATABASE_POOL_TIMEOUT = int(os.getenv("DATABASE_POOL_TIMEOUT", "30"))
+DATABASE_POOL_RECYCLE = int(os.getenv("DATABASE_POOL_RECYCLE", "3600"))
+DATABASE_HEALTH_CHECK_INTERVAL = int(os.getenv("DATABASE_HEALTH_CHECK_INTERVAL", "60"))
+DATABASE_RETRY_ATTEMPTS = int(os.getenv("DATABASE_RETRY_ATTEMPTS", "3"))
+DATABASE_RETRY_DELAY = float(os.getenv("DATABASE_RETRY_DELAY", "2.0"))
+DATABASE_MAX_RETRY_DELAY = float(os.getenv("DATABASE_MAX_RETRY_DELAY", "60.0"))
+
+# Logging configuration
+DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes", "on")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# LLM token configuration
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "200"))
+LLM_CONTEXT_LENGTH = int(os.getenv("LLM_CONTEXT_LENGTH", "2048"))
+
 def validate_config() -> list[str]:
     """
     Validate the configuration and return a list of warnings/errors.
@@ -41,16 +70,53 @@ def validate_config() -> list[str]:
     # Check for development defaults in production-like environments
     # Note: DEFAULT_USER_ID is now optional and can use the default value
     
-    if not LLM_API_KEY and LLM_PROVIDER != 'ollama':
+    if not LLM_API_KEY and LLM_PROVIDER not in ['ollama', 'azure']:
         warnings.append(
             "WARNING: No LLM API key provided. "
-            "Set LLM_API_KEY environment variable."
+            "Set LLM_API_KEY environment variable (can be empty for servers that don't require authentication)."
         )
+    
+    # Azure OpenAI specific validation
+    if LLM_PROVIDER == 'azure':
+        if not AZURE_OPENAI_API_KEY:
+            warnings.append(
+                "WARNING: Azure OpenAI requires AZURE_OPENAI_API_KEY. "
+                "Set AZURE_OPENAI_API_KEY environment variable."
+            )
+        if not AZURE_OPENAI_ENDPOINT:
+            warnings.append(
+                "WARNING: Azure OpenAI requires AZURE_OPENAI_ENDPOINT. "
+                "Set AZURE_OPENAI_ENDPOINT environment variable."
+            )
+        if not AZURE_OPENAI_DEPLOYMENT_NAME:
+            warnings.append(
+                "WARNING: Azure OpenAI requires AZURE_OPENAI_DEPLOYMENT_NAME. "
+                "Set AZURE_OPENAI_DEPLOYMENT_NAME environment variable."
+            )
     
     if not DATABASE_URL:
         warnings.append(
             "WARNING: No database URL provided. "
             "Set DATABASE_URL environment variable."
+        )
+    
+    # Validate database connection settings
+    if DATABASE_POOL_SIZE < 1:
+        warnings.append(
+            "WARNING: DATABASE_POOL_SIZE should be at least 1. "
+            f"Current value: {DATABASE_POOL_SIZE}"
+        )
+    
+    if DATABASE_MAX_CONNECTIONS < DATABASE_POOL_SIZE:
+        warnings.append(
+            "WARNING: DATABASE_MAX_CONNECTIONS should be >= DATABASE_POOL_SIZE. "
+            f"Current values: pool_size={DATABASE_POOL_SIZE}, max_connections={DATABASE_MAX_CONNECTIONS}"
+        )
+    
+    if DATABASE_POOL_TIMEOUT < 5:
+        warnings.append(
+            "WARNING: DATABASE_POOL_TIMEOUT should be at least 5 seconds. "
+            f"Current value: {DATABASE_POOL_TIMEOUT}"
         )
     
     return warnings
