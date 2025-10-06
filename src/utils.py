@@ -394,7 +394,7 @@ def get_mem0_client():
                 "embedding_model_dims": int(os.getenv("EMBEDDING_MODEL_DIMS", "1536" if llm_provider == "openai" else "1024")),
                 # Add index configuration to help with collection detection
                 "index_method": "hnsw",  # Hierarchical Navigable Small World
-                "index_measure": "cosine"  # Cosine similarity
+                "index_measure": "cosine_distance"  # Cosine distance (required by Mem0)
             }
         }
 
