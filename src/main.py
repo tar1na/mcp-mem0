@@ -32,6 +32,17 @@ class Mem0Context:
 # Global client cache to prevent recreation
 _cached_mem0_client = None
 
+# Initialize client at module load time to avoid timing issues
+print("DEBUG: Pre-initializing Mem0 client at module load...")
+try:
+    # Use synchronous initialization at module load
+    _cached_mem0_client = get_mem0_client()
+    print("DEBUG: Mem0 client pre-initialized successfully at module load")
+except Exception as e:
+    print(f"WARNING: Failed to pre-initialize Mem0 client at module load: {e}")
+    print("Client will be initialized on first request")
+    _cached_mem0_client = None
+
 async def initialize_mem0_client():
     """Initialize the Mem0 client with retry logic."""
     global _cached_mem0_client
@@ -133,9 +144,15 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     Yields:
         Mem0Context: The context containing the Mem0 client
     """
-    # Ensure client is initialized before yielding
-    mem0_client = await initialize_mem0_client()
-    yield Mem0Context(mem0_client=mem0_client)
+    global _cached_mem0_client
+    
+    # Ensure we have a client (should be pre-initialized)
+    if _cached_mem0_client is None:
+        print("DEBUG: Client not pre-initialized, initializing now...")
+        _cached_mem0_client = await initialize_mem0_client()
+    
+    # Yield the client immediately - no async operations in yield
+    yield Mem0Context(mem0_client=_cached_mem0_client)
 
 # Initialize FastMCP server with the Mem0 client as context
 mcp = FastMCP(
@@ -388,14 +405,11 @@ async def main():
             print(f"  {warning}")
         print()
     
-    # Initialize the Mem0 client before starting the server
-    print("DEBUG: Pre-initializing Mem0 client...")
-    try:
-        await initialize_mem0_client()
-        print("DEBUG: Mem0 client pre-initialization completed successfully")
-    except Exception as e:
-        print(f"ERROR: Failed to pre-initialize Mem0 client: {e}")
-        print("The server will still start, but may fail on first request")
+    # Client should already be pre-initialized at module load
+    if _cached_mem0_client is not None:
+        print("DEBUG: Mem0 client is ready for requests")
+    else:
+        print("WARNING: Mem0 client not pre-initialized, may cause delays on first request")
     
     try:
         if TRANSPORT == 'sse':
