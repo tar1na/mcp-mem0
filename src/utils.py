@@ -208,7 +208,10 @@ def get_mem0_client():
             "config": {
                 "connection_string": database_url,
                 "collection_name": "mem0_memories",
-                "embedding_model_dims": int(os.getenv("EMBEDDING_MODEL_DIMS", "1536" if llm_provider == "openai" else "1024"))
+                "embedding_model_dims": int(os.getenv("EMBEDDING_MODEL_DIMS", "1536" if llm_provider == "openai" else "1024")),
+                # Add index configuration to help with collection detection
+                "index_method": "hnsw",  # Hierarchical Navigable Small World
+                "index_measure": "cosine"  # Cosine similarity
             }
         }
 

@@ -29,10 +29,14 @@ class Mem0Context:
     """Context for the Mem0 MCP server."""
     mem0_client: Memory
 
+# Global client cache to prevent recreation
+_cached_mem0_client = None
+
 @asynccontextmanager
 async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     """
     Manages the Mem0 client lifecycle with enhanced error handling and automatic recovery.
+    Uses a global cache to prevent client recreation on every request.
     
     Args:
         server: The FastMCP server instance
@@ -40,6 +44,13 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
     Yields:
         Mem0Context: The context containing the Mem0 client
     """
+    global _cached_mem0_client
+    
+    # If we already have a cached client, use it
+    if _cached_mem0_client is not None:
+        yield Mem0Context(mem0_client=_cached_mem0_client)
+        return
+    
     mem0_client = None
     max_retries = 5
     base_retry_delay = 2.0
@@ -117,25 +128,17 @@ async def mem0_lifespan(server: FastMCP) -> AsyncIterator[Mem0Context]:
         if mem0_client is None:
             raise RuntimeError("Failed to initialize Mem0 client after all retry attempts")
         
+        # Cache the client for future use
+        _cached_mem0_client = mem0_client
+        print("DEBUG: Mem0 client cached for reuse")
+        
         # Yield the working client
         yield Mem0Context(mem0_client=mem0_client)
         
     finally:
-        # This cleanup will always run, even if an exception occurs
-        if mem0_client:
-            try:
-                print("DEBUG: Cleaning up Mem0 client...")
-                # Close any open database connections
-                if hasattr(mem0_client, 'close'):
-                    mem0_client.close()
-                elif hasattr(mem0_client, '_close'):
-                    mem0_client._close()
-                # Force garbage collection
-                import gc
-                gc.collect()
-                print("DEBUG: Mem0 client cleanup completed")
-            except Exception as cleanup_error:
-                print(f"DEBUG: Error during cleanup: {cleanup_error}")
+        # Note: We don't clean up the cached client here as it should persist
+        # The client will be cleaned up when the server shuts down
+        pass
 
 # Initialize FastMCP server with the Mem0 client as context
 mcp = FastMCP(
@@ -364,6 +367,21 @@ async def delete_memory(
     except Exception as e:
         return f"Error deleting memory: {str(e)}"
 
+async def cleanup_cached_client():
+    """Clean up the cached Mem0 client when the server shuts down."""
+    global _cached_mem0_client
+    if _cached_mem0_client:
+        try:
+            print("DEBUG: Cleaning up cached Mem0 client...")
+            if hasattr(_cached_mem0_client, 'close'):
+                _cached_mem0_client.close()
+            elif hasattr(_cached_mem0_client, '_close'):
+                _cached_mem0_client._close()
+            _cached_mem0_client = None
+            print("DEBUG: Cached Mem0 client cleanup completed")
+        except Exception as cleanup_error:
+            print(f"DEBUG: Error during cached client cleanup: {cleanup_error}")
+
 async def main():
     # Validate configuration and show warnings
     config_warnings = validate_config()
@@ -373,12 +391,16 @@ async def main():
             print(f"  {warning}")
         print()
     
-    if TRANSPORT == 'sse':
-        # Run the MCP server with sse transport
-        await mcp.run_sse_async()
-    else:
-        # Run the MCP server with stdio transport
-        await mcp.run_stdio_async()
+    try:
+        if TRANSPORT == 'sse':
+            # Run the MCP server with sse transport
+            await mcp.run_sse_async()
+        else:
+            # Run the MCP server with stdio transport
+            await mcp.run_stdio_async()
+    finally:
+        # Clean up the cached client when the server shuts down
+        await cleanup_cached_client()
 
 if __name__ == "__main__":
     asyncio.run(main())
