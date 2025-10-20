@@ -1,21 +1,19 @@
-# User and Session Isolation in mcp-mem0
+# User Isolation in mcp-mem0
 
-This document describes the implementation of user and session isolation in mcp-mem0, ensuring that memories are properly isolated between different users and conversation sessions.
+This document describes the implementation of user isolation in mcp-mem0, ensuring that memories are properly isolated between different users.
 
 ## Overview
 
-mcp-mem0 now supports **required** `userId` and **optional** `sessionId` parameters for all memory operations. This ensures:
+mcp-mem0 supports **required** `userId` parameters for all memory operations. This ensures:
 
 - **User Isolation**: Users can only access their own memories
-- **Session Isolation**: Conversations can be isolated by session when needed
-- **Data Privacy**: No cross-user or cross-session data leakage
+- **Data Privacy**: No cross-user data leakage
 - **Security**: All operations require valid user identification
 
 ## Key Features
 
 ### 🔒 Required Parameters
 - **`userId`**: **REQUIRED** - Unique identifier for each user
-- **`sessionId`**: **OPTIONAL** - Conversation or session identifier
 
 ### 🛡️ Security Features
 - Input validation for required parameters
@@ -32,12 +30,7 @@ mcp-mem0 now supports **required** `userId` and **optional** `sessionId` paramet
 async def save_memory(
     ctx: Context, 
     content: str, 
-    userId: str,                    # REQUIRED
-    sessionId: Optional[str] = None, # OPTIONAL
-    agentId: Optional[str] = None,   # OPTIONAL
-    agentId: Optional[str] = None,   # OPTIONAL
-    appId: Optional[str] = None,     # OPTIONAL
-    metadata: Optional[Dict[str, Any]] = None
+    userId: str                    # REQUIRED
 ) -> str
 ```
 
@@ -47,10 +40,7 @@ async def save_memory(
   "tool": "save_memory",
   "args": {
     "content": "User prefers dark mode interface",
-    "userId": "user_123",
-    "sessionId": "chat_session_abc123",
-    "agentId": "assistant_v1",
-    "appId": "web_interface"
+    "userId": "user_123"
   }
 }
 ```
@@ -63,12 +53,7 @@ async def search_memories(
     ctx: Context, 
     query: str, 
     userId: str,                    # REQUIRED
-    sessionId: Optional[str] = None, # OPTIONAL
-    agentId: Optional[str] = None,   # OPTIONAL
-    appId: Optional[str] = None,     # OPTIONAL
-    threshold: Optional[float] = None,
-    filters: Optional[Dict[str, Any]] = None,
-    topK: Optional[int] = None
+    limit: Optional[int] = None     # OPTIONAL
 ) -> str
 ```
 
@@ -79,9 +64,7 @@ async def search_memories(
   "args": {
     "query": "interface preferences",
     "userId": "user_123",
-    "sessionId": "chat_session_abc123",
-    "topK": 5
-    "topK": 5
+    "limit": 5
   }
 }
 ```
@@ -92,10 +75,7 @@ async def search_memories(
 @mcp.tool()
 async def get_all_memories(
     ctx: Context,
-    userId: str,                    # REQUIRED
-    sessionId: Optional[str] = None, # OPTIONAL
-    agentId: Optional[str] = None,   # OPTIONAL
-    appId: Optional[str] = None      # OPTIONAL
+    userId: str                    # REQUIRED
 ) -> str
 ```
 
@@ -104,8 +84,7 @@ async def get_all_memories(
 {
   "tool": "get_all_memories",
   "args": {
-    "userId": "user_123",
-    "sessionId": "chat_session_abc123"
+    "userId": "user_123"
   }
 }
 ```
@@ -117,9 +96,7 @@ async def get_all_memories(
 async def delete_memory(
     ctx: Context,
     memoryId: str,
-    userId: str,                    # REQUIRED
-    agentId: Optional[str] = None,   # OPTIONAL
-    appId: Optional[str] = None      # OPTIONAL
+    userId: str                    # REQUIRED
 ) -> str
 ```
 
@@ -141,8 +118,6 @@ async def delete_memory(
 ```bash
 # Required for production (override defaults)
 DEFAULT_USER_ID=your_production_user_id
-DEFAULT_AGENT_ID=your_agent_id
-DEFAULT_APP_ID=your_app_id
 
 # Server configuration
 HOST=0.0.0.0
@@ -180,41 +155,40 @@ await save_memory(
     userId="user_123"
 )
 
-# Store session-specific information
+# Store additional user information
 await save_memory(
-    content="Current conversation about web development",
-    userId="user_123",
-    sessionId="web_dev_chat_001"
+    content="User is interested in web development and machine learning",
+    userId="user_123"
 )
 ```
 
-### 2. Session-Isolated Search
+### 2. Memory Search
 
 ```python
-# Search within current session only
+# Search user's memories
 results = await search_memories(
     query="web development",
     userId="user_123",
-    sessionId="web_dev_chat_001"
+    limit=5
 )
 
-# Search across all user sessions
+# Search with default limit (3 results)
 all_results = await search_memories(
     query="Python",
     userId="user_123"
 )
 ```
 
-### 3. Cross-Session Memory Access
+### 3. Memory Management
 
 ```python
-# Get all memories for a user across all sessions
+# Get all memories for a user
 all_memories = await get_all_memories(userId="user_123")
 
-# Get memories from specific session only
-session_memories = await get_all_memories(
-    userId="user_123",
-    sessionId="web_dev_chat_001"
+# Delete a specific memory
+await delete_memory(
+    memoryId="mem_xyz789",
+    userId="user_123"
 )
 ```
 
@@ -225,10 +199,10 @@ session_memories = await get_all_memories(
 - **Always** validate `userId` before processing
 - Use stable, unique identifiers (e.g., auth subject, tenant+user key)
 
-### 2. Session Management
-- `sessionId` should be transient (conversation UUID, HTTP session ID)
-- Don't rely on session IDs for long-term user identification
-- Consider session expiration and cleanup
+### 2. Memory Management
+- `limit` parameter controls search result count (default: 3)
+- Use consistent `userId` for all operations
+- Implement proper error handling for timeout scenarios
 
 ### 3. Environment Security
 - **Never** use default user IDs in production
@@ -247,10 +221,10 @@ python test_user_isolation.py
 
 The test suite validates:
 - ✅ User isolation (no cross-user data access)
-- ✅ Session isolation (session-scoped searches)
-- ✅ Cross-session searches (when no sessionId provided)
+- ✅ Search result limiting (optional limit parameter)
 - ✅ Security validation (required userId)
 - ✅ Error handling and edge cases
+- ✅ Timeout management for long content
 
 ### Manual Testing
 

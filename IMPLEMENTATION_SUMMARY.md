@@ -1,24 +1,26 @@
-# Implementation Summary: User and Session Isolation in mcp-mem0
+# Implementation Summary: User Isolation in mcp-mem0
 
 ## 🎯 What Was Implemented
 
-This implementation adds comprehensive support for **required** `userId` and **optional** `sessionId` parameters to ensure proper memory isolation between users and conversation sessions in mcp-mem0.
+This implementation adds comprehensive support for **required** `userId` parameters to ensure proper memory isolation between users in mcp-mem0.
 
 ## 📁 Files Modified/Created
 
 ### 1. Core Implementation Files
 
 #### `src/main.py` - **MAJOR UPDATE**
-- ✅ Added `userId` (required) and `sessionId` (optional) to all MCP tools
+- ✅ Added `userId` (required) to all MCP tools
 - ✅ Implemented input validation for required parameters
 - ✅ Added comprehensive error handling and security checks
 - ✅ Updated tool signatures to match Mem0's MCP specifications
 - ✅ Added new `delete_memory` tool with user isolation
+- ✅ Fixed timeout issues for long content processing
+- ✅ Fixed schema generation issues for n8n compatibility
 
 **Tools Updated:**
-- `save_memory()` - Now requires `userId`, supports `sessionId`
-- `search_memories()` - Now requires `userId`, supports `sessionId`
-- `get_all_memories()` - Now requires `userId`, supports `sessionId`
+- `save_memory()` - Now requires `userId`
+- `search_memories()` - Now requires `userId`, supports optional `limit`
+- `get_all_memories()` - Now requires `userId`
 - `delete_memory()` - **NEW** tool with user isolation
 
 #### `src/config.py` - **NEW FILE**
@@ -41,11 +43,11 @@ This implementation adds comprehensive support for **required** `userId` and **o
 - ✅ Troubleshooting and support information
 
 #### `test_user_isolation.py` - **NEW FILE**
-- ✅ Complete test suite for user and session isolation
+- ✅ Complete test suite for user isolation
 - ✅ Mock MCP client for testing without external dependencies
 - ✅ Tests for all isolation scenarios
 - ✅ Security validation tests
-- ✅ Cross-user and cross-session isolation verification
+- ✅ Cross-user isolation verification
 
 #### `env.example` - **NEW FILE**
 - ✅ Example environment configuration
@@ -85,14 +87,14 @@ await get_all_memories(ctx)
 
 ### After (New Version)
 ```python
-# New API - Full user and session isolation
+# New API - Full user isolation
 await save_memory(ctx, "User preference", userId="user_123")
-await save_memory(ctx, "Session info", userId="user_123", sessionId="chat_001")
+await save_memory(ctx, "Additional user info", userId="user_123")
 
-await search_memories(ctx, "query", userId="user_123", sessionId="chat_001")
-await search_memories(ctx, "query", userId="user_123")  # Across all sessions
+await search_memories(ctx, "query", userId="user_123", limit=5)
+await search_memories(ctx, "query", userId="user_123")  # Default limit
 
-await get_all_memories(ctx, userId="user_123", sessionId="chat_001")
+await get_all_memories(ctx, userId="user_123")
 await delete_memory(ctx, "mem_id", userId="user_123")
 ```
 
@@ -114,10 +116,10 @@ The test suite validates:
 
 📋 Summary:
 • Users can only access their own memories
-• Sessions can be isolated when sessionId is provided
 • Cross-user data leakage is prevented
-• Cross-session searches work when no sessionId is provided
 • Security validation prevents operations without userId
+• Optional limit parameter for search result control
+• Comprehensive error handling and timeout management
 ```
 
 ## 🔧 Configuration Requirements
@@ -151,8 +153,8 @@ DATABASE_URL=your_database_url
 
 2. **Update Client Code**
    - Add `userId` parameter to all memory operations
-   - Optionally add `sessionId` for conversation isolation
-   - Update parameter names (e.g., `limit` → `topK`)
+   - Update parameter names (e.g., `topK` → `limit`)
+   - Handle optional `limit` parameter for search results
 
 3. **Test Isolation**
    - Verify no cross-user data access
@@ -205,10 +207,10 @@ await search_memories(ctx, "query", userId="user_123", topK=5)
 - **ALWAYS** set proper environment variables
 - **MUST** provide valid `userId` in all tool calls
 
-### 3. **Session Management**
-- `sessionId` is optional but recommended for conversation isolation
-- Use transient identifiers (UUIDs, conversation IDs)
-- Don't rely on session IDs for long-term user identification
+### 3. **Memory Management**
+- `limit` parameter is optional for search results (default: 3)
+- Use consistent `userId` for all operations
+- Implement proper error handling for timeout scenarios
 
 ## 🔮 Future Enhancements
 
