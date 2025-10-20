@@ -20,6 +20,7 @@ from config import (
     HOST, 
     PORT, 
     TRANSPORT,
+    MCP_TIMEOUT,
     validate_config
 )
 
@@ -159,7 +160,8 @@ mcp = FastMCP(
     "mcp-mem0",
     lifespan=mem0_lifespan,
     host=HOST,
-    port=PORT
+    port=PORT,
+    timeout=MCP_TIMEOUT
 )        
 
 @mcp.tool()
@@ -184,31 +186,60 @@ async def save_memory(
         if not userId or userId.strip() == "":
             return "Error: userId is required and cannot be empty"
         
+        if not content or content.strip() == "":
+            return "Error: content cannot be empty"
+        
         mem0_client = ctx.request_context.lifespan_context.mem0_client
+        
+        # Log content length for debugging
+        content_length = len(content)
+        print(f"DEBUG: Attempting to save memory for user: {userId}")
+        print(f"DEBUG: Content length: {content_length} characters")
+        print(f"DEBUG: Memory content preview: {content[:100]}...")
+        
+        # For very long content, we might want to chunk it or provide progress updates
+        if content_length > 1000:
+            print(f"DEBUG: Processing long content ({content_length} chars), this may take a moment...")
         
         # Prepare the memory payload
         messages = [{"role": "user", "content": content}]
         
-        # Add memory with proper isolation
+        # Add memory with proper isolation and timeout handling
         # Note: Mem0's add() method only supports user_id and metadata
         try:
-            print(f"DEBUG: Attempting to save memory for user: {userId}")
-            print(f"DEBUG: Memory content: {content[:100]}...")
-            
-            mem0_client.add(
-                messages, 
-                user_id=userId,
-                metadata=None
+            # Use asyncio.wait_for to add our own timeout as a safety net
+            # This is in addition to the MCP server timeout
+            result = await asyncio.wait_for(
+                asyncio.to_thread(
+                    mem0_client.add,
+                    messages, 
+                    user_id=userId,
+                    metadata=None
+                ),
+                timeout=MCP_TIMEOUT - 30  # Leave 30 seconds buffer for MCP overhead
             )
             print(f"DEBUG: Memory saved successfully")
+        except asyncio.TimeoutError:
+            return f"Error: Memory save operation timed out after {MCP_TIMEOUT - 30} seconds. Content may be too long or complex."
         except Exception as mem0_error:
-            return f"Error calling Mem0 add: {str(mem0_error)}"
+            error_msg = str(mem0_error)
+            if "timeout" in error_msg.lower():
+                return f"Error: Memory save operation timed out. The content may be too long or the server is overloaded. Original error: {error_msg}"
+            elif "database" in error_msg.lower() or "connection" in error_msg.lower():
+                return f"Error: Database connection issue while saving memory. Please try again. Original error: {error_msg}"
+            else:
+                return f"Error calling Mem0 add: {error_msg}"
         
         # Log the operation for security monitoring
-        return f"Successfully saved memory for user '{userId}': {content[:100]}..." if len(content) > 100 else f"Successfully saved memory for user '{userId}': {content}"
+        preview = content[:100] + "..." if len(content) > 100 else content
+        return f"Successfully saved memory for user '{userId}' ({content_length} chars): {preview}"
     
     except Exception as e:
-        return f"Error saving memory: {str(e)}"
+        error_msg = str(e)
+        if "timeout" in error_msg.lower():
+            return f"Error: Operation timed out. The content may be too long or complex. Please try with shorter content or contact support if the issue persists."
+        else:
+            return f"Error saving memory: {error_msg}"
 
 @mcp.tool()
 async def get_all_memories(
@@ -283,7 +314,7 @@ async def search_memories(
     ctx: Context, 
     query: str, 
     userId: str,
-    topK: Optional[int] = None
+    topK: int = 3
 ) -> str:
     """Search memories using semantic search with user isolation.
 
@@ -304,8 +335,8 @@ async def search_memories(
         
         mem0_client = ctx.request_context.lifespan_context.mem0_client
         
-        # Set default limit if not provided
-        limit = topK if topK is not None else 3
+        # Use the provided limit
+        limit = topK
         
         # Search memories with proper isolation
         # Note: Mem0's search() method only supports query, user_id, and limit parameters

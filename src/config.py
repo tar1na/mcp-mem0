@@ -17,6 +17,7 @@ DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "default_user")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8050"))
 TRANSPORT = os.getenv("TRANSPORT", "sse")
+MCP_TIMEOUT = int(os.getenv("MCP_TIMEOUT", "300"))  # 5 minutes default timeout
 
 # Mem0 configuration
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
