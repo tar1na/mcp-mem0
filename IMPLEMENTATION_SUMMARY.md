@@ -19,7 +19,7 @@ This implementation adds comprehensive support for **required** `userId` paramet
 
 **Tools Updated:**
 - `save_memory()` - Now requires `userId`
-- `search_memories()` - Now requires `userId`, supports optional `limit`
+- `search_memories()` - Now requires `userId` (no limit parameter)
 - `get_all_memories()` - Now requires `userId`
 - `delete_memory()` - **NEW** tool with user isolation
 
@@ -91,8 +91,8 @@ await get_all_memories(ctx)
 await save_memory(ctx, "User preference", userId="user_123")
 await save_memory(ctx, "Additional user info", userId="user_123")
 
-await search_memories(ctx, "query", userId="user_123", limit=5)
-await search_memories(ctx, "query", userId="user_123")  # Default limit
+await search_memories(ctx, "query", userId="user_123")
+await search_memories(ctx, "another query", userId="user_123")
 
 await get_all_memories(ctx, userId="user_123")
 await delete_memory(ctx, "mem_id", userId="user_123")
@@ -118,7 +118,7 @@ The test suite validates:
 • Users can only access their own memories
 • Cross-user data leakage is prevented
 • Security validation prevents operations without userId
-• Optional limit parameter for search result control
+• Search returns all relevant results (no limit parameter)
 • Comprehensive error handling and timeout management
 ```
 
@@ -153,8 +153,8 @@ DATABASE_URL=your_database_url
 
 2. **Update Client Code**
    - Add `userId` parameter to all memory operations
-   - Update parameter names (e.g., `topK` → `limit`)
-   - Handle optional `limit` parameter for search results
+   - Remove any `limit` parameter usage for search operations
+   - Update parameter names (e.g., `topK` → removed)
 
 3. **Test Isolation**
    - Verify no cross-user data access
@@ -208,7 +208,7 @@ await search_memories(ctx, "query", userId="user_123", topK=5)
 - **MUST** provide valid `userId` in all tool calls
 
 ### 3. **Memory Management**
-- `limit` parameter is optional for search results (default: 3)
+- Search returns all relevant results (no limit parameter)
 - Use consistent `userId` for all operations
 - Implement proper error handling for timeout scenarios
 

@@ -52,8 +52,7 @@ async def save_memory(
 async def search_memories(
     ctx: Context, 
     query: str, 
-    userId: str,                    # REQUIRED
-    limit: Optional[int] = None     # OPTIONAL
+    userId: str                    # REQUIRED
 ) -> str
 ```
 
@@ -63,8 +62,7 @@ async def search_memories(
   "tool": "search_memories",
   "args": {
     "query": "interface preferences",
-    "userId": "user_123",
-    "limit": 5
+    "userId": "user_123"
   }
 }
 ```
@@ -168,11 +166,10 @@ await save_memory(
 # Search user's memories
 results = await search_memories(
     query="web development",
-    userId="user_123",
-    limit=5
+    userId="user_123"
 )
 
-# Search with default limit (3 results)
+# Search for different topics
 all_results = await search_memories(
     query="Python",
     userId="user_123"
@@ -200,9 +197,9 @@ await delete_memory(
 - Use stable, unique identifiers (e.g., auth subject, tenant+user key)
 
 ### 2. Memory Management
-- `limit` parameter controls search result count (default: 3)
 - Use consistent `userId` for all operations
 - Implement proper error handling for timeout scenarios
+- Search returns all relevant results (no limit parameter)
 
 ### 3. Environment Security
 - **Never** use default user IDs in production
@@ -221,7 +218,7 @@ python test_user_isolation.py
 
 The test suite validates:
 - ✅ User isolation (no cross-user data access)
-- ✅ Search result limiting (optional limit parameter)
+- ✅ Search functionality (returns all relevant results)
 - ✅ Security validation (required userId)
 - ✅ Error handling and edge cases
 - ✅ Timeout management for long content

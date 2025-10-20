@@ -313,8 +313,7 @@ async def get_all_memories(
 async def search_memories(
     ctx: Context, 
     query: str, 
-    userId: str,
-    limit: Optional[int] = None
+    userId: str
 ) -> str:
     """Search memories using semantic search with user isolation.
 
@@ -326,7 +325,6 @@ async def search_memories(
         ctx: The MCP server provided context which includes the Mem0 client
         query: Search query string describing what you're looking for. Can be natural language.
         userId: Required user identifier for memory isolation (must be provided)
-        limit: Maximum number of results to return (default: 3)
     """
     try:
         # Validate required parameters
@@ -335,16 +333,12 @@ async def search_memories(
         
         mem0_client = ctx.request_context.lifespan_context.mem0_client
         
-        # Set default limit if not provided
-        search_limit = limit if limit is not None else 3
-        
         # Search memories with proper isolation
-        # Note: Mem0's search() method only supports query, user_id, and limit parameters
+        # Note: Mem0's search() method only supports query and user_id parameters
         try:
             memories = mem0_client.search(
                 query, 
-                user_id=userId,
-                limit=search_limit
+                user_id=userId
             )
             print(f"DEBUG: Mem0 search returned: {type(memories)} - {memories}")
         except Exception as mem0_error:
